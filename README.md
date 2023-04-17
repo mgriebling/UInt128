@@ -6,7 +6,7 @@ since there seems to be no way to fake support for StaticBigInt on lower OS vers
 commenting out alternate ExpressibleByIntegerLiteral implementations. 
 I **really** tried to get this to work automagically — but failed.
 
-This package is usually one or more orders of magnitude faster than any other UInt128 implementations.
+This package is usually at least ten times faster than other UInt128 implementations.
 If you find something faster, please let me know.
 
 This package is compliant with the following protocols:
@@ -15,12 +15,16 @@ This package is compliant with the following protocols:
 2. BinaryInteger
 3. FixedWidthInteger
 4. Numeric
+4. AdditiveArithmetic
+9. Plottable (for Charts)
 5. ExpressibleByIntegerLiteral (with StaticBigInt support)
 6. ExpressibleByStringLiteral
+6. LosslessStringConvertible
 7. CustomStringConvertible
 7. CustomDebugStringConvertible
 8. Comparable
 9. Equatable
+9. Strideable
 10. Hashable
 11. Sendable
 12. Codable

@@ -1148,7 +1148,7 @@ final class BasicUInt128Tests: XCTestCase {
     }
     
     func testPerformanceUInt128ToString() {
-        // UInt128 to String is 381X faster than UInt128 from Gerber
+        // UInt128 to String is 380X faster than UInt128 from Gerber
         self.measure {
             for _ in 1...100 {
                 let _ = UInt128.max.description

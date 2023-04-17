@@ -1,13 +1,38 @@
 import Foundation
+import Charts
 
+/**
+Copyright © 2023 Computer Inspirations. All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+///
+///  The **UInt128** type provides a Swift-based implementation of a 128-bit unsigned integer.
+///  There are no guarantees of functionality for a given purpose.
+///  If you do fix bugs or missing functions, I'd appreciate getting updates of the source.
+///
+///  Created by Mike Griebling on 17 Apr 2023
+///
 public struct UInt128 : Sendable {
     
     /// This gets used quite a bit so provide a prebuilt value
-    static public let zero = (0,0)
+    static public let zero = (UInt64(0), UInt64(0))
     
     /// Internal data representation - pretty simple
     var value : (highBits:UInt64, lowBits:UInt64)
     
+    //////////////////////////////////////////////////////////////////////////////////////////
     // MARK: - Initializers
     
     public init(high: UInt64, low: UInt64) {
@@ -20,19 +45,12 @@ public struct UInt128 : Sendable {
     }
     
     private init(_ digits: [Digit]) {
-//        var digits = digits
-//        let mask = Digit(Self.mask)
-//        let shift = Digit(Self.shift)
-//        while digits.count < 5 { digits.append(0) }
-//        let low  = UInt64(digits[0] & mask) |                 // lowest 31 bits
-//                   (UInt64(digits[1] & mask) << shift) |      // next 31 bits
-//                   (UInt64(digits[2] & 0x3) << (shift*2))     // and 2 bits
-//        let high = UInt64(digits[2] & mask) >> 2 |            // next 29 bits
-//                   (UInt64(digits[3] & mask) << (shift-2)) |  // next 31 bits
-//                   (UInt64(digits[4]) << 60)                  // last 4 bits
         self.init(high: UInt64(digits[1]), low: UInt64(digits[0]))
     }
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////
+// MARK: - Codable compliance
 
 extension UInt128 : Codable {
     
@@ -54,12 +72,18 @@ extension UInt128 : Codable {
     }
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////
+// MARK: - Hashable compliance
+
 extension UInt128 : Hashable {
     public func hash(into hasher: inout Hasher) {
         hasher.combine(value.highBits)
         hasher.combine(value.lowBits)
     }
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////
+// MARK: - ExpressibleByIntegerLiteral compliance
 
 extension UInt128 : ExpressibleByIntegerLiteral {
     
@@ -79,6 +103,9 @@ extension UInt128 : ExpressibleByIntegerLiteral {
     }
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////
+// MARK: - Comparable and Equatable compliance
+
 extension UInt128 : Comparable, Equatable {
     
     static public func < (lhs: UInt128, rhs: UInt128) -> Bool {
@@ -97,6 +124,9 @@ extension UInt128 : Comparable, Equatable {
         return false
     }
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////
+// MARK: - CustomStringConvertible and CustomDebugStringConvertible compliance
 
 extension UInt128 : CustomStringConvertible, CustomDebugStringConvertible {
     
@@ -122,6 +152,9 @@ extension UInt128 : CustomStringConvertible, CustomDebugStringConvertible {
     
     /// Converts the UInt128 `self` into a string with a given `radix`.  The radix
     /// string can use uppercase characters if `uppercase` is true.
+    ///
+    /// Why convert numbers in chunks?  This approach reduces the number of calls
+    /// to division and modulo functions so is more efficient than a naïve digit-based approach.
     public func string(withRadix radix:Int = 10, uppercase:Bool = false) -> String {
         if self == Self.zero { return "0" }
         let radix = Swift.min(radix, 36)
@@ -139,9 +172,11 @@ extension UInt128 : CustomStringConvertible, CustomDebugStringConvertible {
     }
     
     public var description: String { string() }
-    
     public var debugDescription: String { string() }
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////
+// MARK: - ExpressibleByStringLiteral compliance
 
 extension UInt128 : ExpressibleByStringLiteral {
     
@@ -161,6 +196,8 @@ extension UInt128 : ExpressibleByStringLiteral {
         return nil
     }
     
+    /// This method breaks `string` into pieces to reduce overhead of the
+    /// multiplications and allow UInt64 to work in converting larger numbers.
     private func value(from string: String, radix: Int = 10) -> UInt128? {
         // Do our best to clean up the input string
         let spaces = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "_"))
@@ -192,11 +229,12 @@ extension UInt128 : ExpressibleByStringLiteral {
         return r
     }
     
-    static var powers = [UInt64]()  /* powers of radix up to UInt64.max */
+    /// Precomputed powers of rⁿ where r is the radix up to UInt64.max
+    static var powers = [UInt64]()
     
     /// Multiplies `x` by rⁿ where r is the `radix` and returns the product
     private static func timesOne(to n: Int, x: UInt128, radix: UInt64) -> UInt128 {
-        // calculate the powers of 10 — you'll thank me later
+        // calculate the powers of the radix and store in a table — you'll thank me later
         if powers.isEmpty || powers.first! != radix {
             powers = [UInt64]()
             var x = UInt64(1)
@@ -211,6 +249,9 @@ extension UInt128 : ExpressibleByStringLiteral {
     }
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////
+// MARK: - BinaryInteger compliance
+
 extension UInt128 : BinaryInteger {
 
     public typealias Words = [UInt]
@@ -224,6 +265,22 @@ extension UInt128 : BinaryInteger {
     public var words: Words { Array(value.lowBits.words) + Array(value.highBits.words) }
     public var magnitude: UInt128 { self }
     public var bitWidth: Int { value.highBits.bitWidth + value.lowBits.bitWidth }
+    
+    public var trailingZeroBitCount: Int {
+        if value.lowBits == 0 {
+            return value.highBits.trailingZeroBitCount + value.lowBits.bitWidth
+        }
+        return value.lowBits.trailingZeroBitCount
+    }
+    
+    public var leadingZeroBitCount: Int {
+        if value.highBits == 0 {
+            return value.lowBits.leadingZeroBitCount + value.highBits.bitWidth
+        }
+        return value.highBits.leadingZeroBitCount
+    }
+    
+    // MARK: - Initializers
     
     public init?<T>(exactly source: T) where T : BinaryFloatingPoint {
         if source.isZero { self = UInt128(); return }
@@ -257,20 +314,6 @@ extension UInt128 : BinaryInteger {
         guard source >= 0 else { self = Self.min; return }
         guard source.bitWidth <= Self.bitWidth else { self = Self.max; return }
         self.init(high: 0, low: UInt64(source))
-    }
-    
-    public var trailingZeroBitCount: Int {
-        if value.lowBits == 0 {
-            return value.highBits.trailingZeroBitCount + value.lowBits.bitWidth
-        }
-        return value.lowBits.trailingZeroBitCount
-    }
-    
-    public var leadingZeroBitCount: Int {
-        if value.highBits == 0 {
-            return value.lowBits.leadingZeroBitCount + value.highBits.bitWidth
-        }
-        return value.highBits.leadingZeroBitCount
     }
     
     // MARK: - Basic Mathematical Operations
@@ -377,7 +420,14 @@ extension UInt128 : BinaryInteger {
     }
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////
+// MARK: - UnsignedInteger, LosslessStringConvertible, Strideable, Numeric, AdditiveArithmetic compliance
+
 extension UInt128 : UnsignedInteger { }
+
+extension UInt128 : LosslessStringConvertible { }
+
+extension UInt128 : Strideable { }
 
 extension UInt128 : Numeric {
     public init?<T>(exactly source: T) where T : BinaryInteger {
@@ -385,6 +435,28 @@ extension UInt128 : Numeric {
         self.init(high: 0, low: UInt64(source))
     }
 }
+
+extension UInt128 : AdditiveArithmetic { }
+
+//////////////////////////////////////////////////////////////////////////////////////////
+// MARK: - Plottable compliance
+
+@available(macOS 13.0, *)
+extension UInt128 : Plottable {
+    
+    public var primitivePlottable: Double {
+        Double(self)
+    }
+    
+    public init?(primitivePlottable x: Double) {
+        guard x.isFinite && (x - x.rounded()).isZero else { return nil }
+        self.init(x)
+    }
+    
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+// MARK: - FixedWidthInteger compliance
 
 extension UInt128 : FixedWidthInteger {
     
