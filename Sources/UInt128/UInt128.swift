@@ -20,17 +20,17 @@ public struct UInt128 : Sendable {
     }
     
     private init(_ digits: [Digit]) {
-        var digits = digits
-        let mask = Digit(Self.mask)
-        let shift = Digit(Self.shift)
-        while digits.count < 5 { digits.append(0) }
-        let low  = UInt64(digits[0] & mask) |                 // lowest 31 bits
-                   (UInt64(digits[1] & mask) << shift) |      // next 31 bits
-                   (UInt64(digits[2] & 0x3) << (shift*2))     // and 2 bits
-        let high = UInt64(digits[2] & mask) >> 2 |            // next 29 bits
-                   (UInt64(digits[3] & mask) << (shift-2)) |  // next 31 bits
-                   (UInt64(digits[4]) << 60)                  // last 4 bits
-        self.init(high: high, low: low)
+//        var digits = digits
+//        let mask = Digit(Self.mask)
+//        let shift = Digit(Self.shift)
+//        while digits.count < 5 { digits.append(0) }
+//        let low  = UInt64(digits[0] & mask) |                 // lowest 31 bits
+//                   (UInt64(digits[1] & mask) << shift) |      // next 31 bits
+//                   (UInt64(digits[2] & 0x3) << (shift*2))     // and 2 bits
+//        let high = UInt64(digits[2] & mask) >> 2 |            // next 29 bits
+//                   (UInt64(digits[3] & mask) << (shift-2)) |  // next 31 bits
+//                   (UInt64(digits[4]) << 60)                  // last 4 bits
+        self.init(high: UInt64(digits[1]), low: UInt64(digits[0]))
     }
 }
 
@@ -294,183 +294,23 @@ extension UInt128 : BinaryInteger {
     }
     
     public static func / (lhs: UInt128, rhs: UInt128) -> UInt128 {
-        let result = divRemAbs(lhs.toInteger(), w1: rhs.toInteger())
-        return UInt128(result.div)
+        //let result = divRemAbs(lhs.toInteger(), w1: rhs.toInteger())
+        let result = divideWithRemainder_KnuthD((0, lhs), by: rhs).quotient
+        return UInt128(result)
     }
 
     public static func % (lhs: UInt128, rhs: UInt128) -> UInt128 {
-        let result = divRemAbs(lhs.toInteger(), w1: rhs.toInteger())
-        return UInt128(result.rem)
+        // let result = divRemAbs(lhs.toInteger(), w1: rhs.toInteger())
+        let result = divideWithRemainder_KnuthD((0, lhs), by: rhs).remainder
+        return UInt128(result)
     }
 
     public func quotientAndRemainder (dividingBy rhs: UInt128) -> (quotient: UInt128, remainder: UInt128) {
-        let result = Self.divRemAbs(self.toInteger(), w1: rhs.toInteger())
-        return (UInt128(result.div), UInt128(result.rem))
+        // let result = Self.divRemAbs(self.toInteger(), w1: rhs.toInteger())
+        let result = Self.divideWithRemainder_KnuthD((0, self), by: rhs)
+        return (UInt128(result.quotient), UInt128(result.remainder))
     }
     
-    
-    // MARK: - Helper functions for division and modulo
-    
-    private typealias Digit = UInt32
-    private typealias TwoDigits = UInt64
-    private typealias Integer = [Digit]
-    private static let shift = Digit.bitWidth-1
-    private static let base  = 1 << shift
-    private static let mask  = base - 1
-    
-    /// Note: Each Integer word contains 31 bits so the
-    /// 128 bits must be broken into 5 words with the
-    /// upper word having 4 bits and all others 31.
-    private func toInteger(fullNormalization:Bool = false) -> Integer {
-        let mask  = TwoDigits(Self.mask)
-        var low   = TwoDigits(self.value.lowBits)
-        var high  = TwoDigits(self.value.highBits)
-        let low1  = Digit(low & mask); low >>= Self.shift
-        let low2  = Digit(low & mask); low >>= Self.shift
-        let mid   = Digit(low) | (Digit(high & (mask >> 2)) << 2); high >>= Self.shift-2
-        let high1 = Digit(high & mask); high >>= Self.shift
-        let high2 = Digit(high)
-        
-        // quick normalization
-        if high2 == 0 {
-            if high1 == 0 {
-                if mid == 0 {
-                    if fullNormalization && low2 == 0 {
-                        return [low1]
-                    }
-                    // Note: div algorithm needs at least two words
-                    // so the upper word `low2` may be zero at this point
-                    return [low1, low2]
-                }
-                return [low1, low2, mid]
-            }
-            return [low1, low2, mid, high1]
-        }
-        return [low1, low2, mid, high1, high2]
-    }
-    
-    private static func toInteger(high:UInt128, low:UInt128) -> Integer {
-        // realign the bits into words
-        var xh = high.toInteger(fullNormalization: true)
-
-        // shift left by 128 bits
-        if high != UInt128.zero {
-            xh.insert(contentsOf: [0,0,0,0], at: 0) // shift left 31*4 = 124 bits
-            Self.mul(&xh, n: 0x10)                  // shift left 4 bits
-        }
-
-        // add in the low digits
-        if low != UInt128.zero {
-            // realign the bits for the Integer-representation
-            let xl = low.toInteger(fullNormalization: true)
-            return xl + xh
-        } else {
-            return xh
-        }
-    }
-    
-    /// Multiply `a` by a single digit *n*, ignoring the sign.
-    private static func mul(_ a: inout [Digit], n: Digit) {
-        let sizeA = a.count
-        var z = [Digit](repeating: 0, count: sizeA+1)
-        var carry = TwoDigits(0)
-        for i in 0..<sizeA {
-            carry += TwoDigits(a[i]) * TwoDigits(n)
-            z[i] = Digit(carry & TwoDigits(mask))
-            carry >>= TwoDigits(shift)
-        }
-        z[sizeA] = Digit(carry)
-        normalize(&z)
-        a = z
-    }
-    
-    private static func normalize(_ a: inout [Digit]) {
-        while a.last == 0 { a.removeLast() }
-    }
-    
-    /// Divide a long integer *a* by a digit *n*, returning both the quotient
-    /// (as function result) and the remainder *rem*.
-    /// The sign of *a* is ignored; *n* should not be zero.
-    private static func divRem (_ a: [Digit], n: TwoDigits) -> (div:[Digit], rem:Digit) {
-        assert(n > 0 && n <= base, "\(#function): assertion failed")
-        let size = a.count
-        var z = a
-        var rem = TwoDigits(0)
-        for size in (0..<size).reversed() {
-            rem = (rem << shift) | TwoDigits(a[size])
-            let hi = rem / n
-            z[size] = Digit(hi)
-            rem -= hi * n
-        }
-        normalize(&z)
-        return (z, Digit(rem))
-    }
-    
-    /// Unsigned long division of `v1` divided by `w1` with remainder.
-    /// Note: This algorithm will work with unsigned integers of any length
-    private static func divRemAbs (_ v1: [Digit], w1: [Digit]) -> (div: [Digit], rem: [Digit]) {
-        let sizeW = w1.count
-        let d = Digit(TwoDigits(base) / TwoDigits(w1[sizeW-1]+1))
-        var v = v1, w = w1
-        Self.mul(&v, n:d)
-        Self.mul(&w, n:d)
-        
-        guard v.count > 0 else { return (v1, v1) }
-        guard v1.count >= sizeW && sizeW > 1 else { return ([Digit](), v1) }
-
-        assert(sizeW == w.count, "\(#function): assertion 2 failed")
-        
-        let sizeV = v.count
-        var a = [Digit](repeating: 0, count: sizeV-sizeW+1)
-        var j = sizeV
-        for k in (0..<a.count).reversed() {
-            let vj: TwoDigits = j >= sizeV ? 0 : TwoDigits(v[j])
-            let base = TwoDigits(base)
-            let mask = TwoDigits(mask)
-            let w1digit = TwoDigits(w[sizeW-1])
-            let w2digit = TwoDigits(w[sizeW-2])
-            let vdigit = TwoDigits(v[j-1])
-            var q = vj == w1digit ? mask : (vj*base + vdigit) / w1digit
-            
-            while w2digit*q > (vj*base + vdigit - q*w1digit)*base + TwoDigits(v[j-2]) {
-                q -= 1
-            }
-            
-            var i = 0
-            var carry: Int = 0
-            while i < sizeW && i+k < sizeV {
-                let z = TwoDigits(w[i])*q
-                let zz = z / base
-                carry += Int(v[i+k]) - Int(z) + Int(zz*base)
-                v[i+k] = Digit(carry & Int(mask))
-                carry >>= shift
-                carry -= Int(zz)
-                i += 1
-            }
-            
-            if i+k < sizeV {
-                carry += Int(v[i+k])
-                v[i+k] = 0
-            }
-            
-            if carry == 0 {
-                a[k] = Digit(q)
-            } else {
-                assert(carry == -1, "\(#function): carry != -1")
-                a[k] = Digit(q-1)
-                carry = 0
-                for i in 0..<sizeW where i+k < sizeV {
-                    carry += Int(v[i+k] + w[i])
-                    v[i+k] = Digit(carry & Int(mask))
-                    carry >>= TwoDigits(shift)
-                }
-            }
-            j -= 1
-        }
-        normalize(&a)
-        let (div, _) = divRem(v, n:TwoDigits(d))
-        return (a, div)
-    } // DivRemAbs;
     
     // MARK: - Convenience math functions
     public static func /= (lhs: inout UInt128, rhs: UInt128) { lhs = lhs / rhs }
@@ -607,21 +447,266 @@ extension UInt128 : FixedWidthInteger {
 
     public func dividedReportingOverflow(by rhs: UInt128) -> (partialValue: UInt128, overflow: Bool) {
         guard rhs != Self.zero else { return (self, true) }
-        let result = Self.divRemAbs(self.toInteger(), w1: rhs.toInteger()).div
+        // let result = Self.divRemAbs(self.toInteger(), w1: rhs.toInteger()).div
+        let result = Self.divideWithRemainder_KnuthD((0, self), by: rhs).quotient
         return (UInt128(result), false)
     }
 
     public func remainderReportingOverflow(dividingBy rhs: UInt128) -> (partialValue: UInt128, overflow: Bool) {
         guard rhs != Self.zero else { return (self, true) }
-        let result = Self.divRemAbs(self.toInteger(), w1: rhs.toInteger()).rem
+        // let result = Self.divRemAbs(self.toInteger(), w1: rhs.toInteger()).rem
+        let result = Self.divideWithRemainder_KnuthD((0, self), by: rhs).remainder
         return (UInt128(result), false)
     }
 
     public func dividingFullWidth(_ dividend: (high: UInt128, low: UInt128)) -> (quotient: UInt128, remainder: UInt128) {
-        let result = Self.divRemAbs(Self.toInteger(high:dividend.high, low:dividend.low), w1: self.toInteger())
-        return (UInt128(result.div), UInt128(result.rem))
+        //let result = Self.divRemAbs(Self.toInteger(high:dividend.high, low:dividend.low), w1: self.toInteger())
+        let result = Self.divideWithRemainder_KnuthD(dividend, by: self)
+        return (UInt128(result.quotient), UInt128(result.remainder))
     }
     
+}
+
+// MARK: - TwoDigit Helper Utility Methods
+
+// -------------------------------------
+private extension FixedWidthInteger {
+    /// Fast creation of an integer from a Bool
+    init(_ source: Bool) {
+        assert(unsafeBitCast(source, to: UInt8.self) & 0xfe == 0)
+        self.init(unsafeBitCast(source, to: UInt8.self))
+    }
+}
+
+private typealias Digit = UInt
+private typealias TwoDigits = (high: Digit, low: Digit)
+
+/**
+ The operators below implement the tuple operations for the 2-digit
+ arithmetic needed for Knuth's Algorithm D, and *only* those operations.
+ There is no attempt to be a complete set. They are meant to make the code that
+ uses them more readable than if the operations they express were written out
+ directly.
+ */
+
+infix operator /% : MultiplicationPrecedence
+
+/// Divide a tuple of digits `left` by 1 digit `right` returning both quotient and remainder
+private func /% (left: TwoDigits, right: Digit) -> (quotient: TwoDigits, remainder: TwoDigits) {
+    var r: Digit
+    let q: TwoDigits
+    (q.high, r) = left.high.quotientAndRemainder(dividingBy: right)
+    (q.low, r) = right.dividingFullWidth((high: r, low: left.low))
+    return (q, (high: 0, low: r))
+}
+
+/// Multiply a tuple of digits `left` by 1 digit `right` returning both quotient and remainder
+private func * (left: TwoDigits, right: Digit) -> TwoDigits {
+    var product = left.low.multipliedFullWidth(by: right)
+    let productHigh = left.high.multipliedFullWidth(by: right)
+    assert(productHigh.high == 0, "multiplication overflow")
+    let c = addReportingCarry(&product.high, productHigh.low)
+    assert(c == 0, "multiplication overflow")
+    return product
+}
+
+private func > (left: TwoDigits, right: TwoDigits) -> UInt8 {
+    return UInt8(left.high > right.high) |
+            (UInt8(left.high == right.high) & UInt8(left.low > right.low))
+}
+
+/// Subtract a digit from a tuple, borrowing the high part if necessary
+private func -= (left: inout TwoDigits, right: Digit) {
+    left.high &-= subtractReportingBorrow(&left.low, right)
+}
+
+/// Add a digit to a tuple's low part, carrying to the high part.
+private func += (left: inout TwoDigits, right: Digit) {
+    left.high &+= addReportingCarry(&left.low, right)
+}
+
+// -------------------------------------
+/// Add one tuple to another tuple
+private func += (left: inout TwoDigits, right: TwoDigits) {
+    left.high &+= addReportingCarry(&left.low, right.low)
+    left.high &+= right.high
+}
+
+private func subtractReportingBorrow(_ x: inout Digit, _ y: Digit) -> Digit {
+    let b: Bool
+    (x, b) = x.subtractingReportingOverflow(y)
+    return Digit(b)
+}
+
+private func addReportingCarry(_ x: inout Digit, _ y: Digit) -> Digit {
+    let c: Bool
+    (x, c) = x.addingReportingOverflow(y)
+    return Digit(c)
+}
+
+extension UInt128 {
+    
+    /*************************************************************************************/
+    /**  Following division code was shamelessly borrowed from Chip Jarred who in turn   */
+    /**  implemented the algorithm from Donald Knuth's *Algorithm D* for dividing        */
+    /**  multiprecision unsigned integers from *The Art of Computer Programming*         */
+    /**  Volume 2: *Semi-numerical Algorithms*, Chapter 4.3.3.                           */
+    
+    /*
+        Copyright 2020 Chip Jarred
+
+        Permission is hereby granted, free of charge, to any person obtaining a copy
+        of this software and associated documentation files (the "Software"), to deal
+        in the Software without restriction, including without limitation the rights
+        to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+        copies of the Software, and to permit persons to whom the Software is
+        furnished to do so, subject to the following conditions:
+
+        The above copyright notice and this permission notice shall be included in all
+        copies or substantial portions of the Software.
+
+        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+        AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+        LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+        OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+        SOFTWARE.
+    */
+    private static func leftShift(_ x: [Digit], by shift: Int, into y: inout [Digit]) {
+        assert(y.count >= x.count)
+        assert(y.startIndex == x.startIndex)
+        let bitWidth = Digit.bitWidth
+        
+        for i in (1..<x.count).reversed() {
+            y[i] = (x[i] << shift) | (x[i - 1] >> (bitWidth - shift))
+        }
+        y[0] = x[0] << shift
+    }
+    
+    private static func rightShift(_ x: [Digit], by shift: Int, into y: inout [Digit]) {
+        assert(y.count == x.count)
+        assert(y.startIndex == x.startIndex)
+        let bitWidth = Digit.bitWidth
+        
+        let lastElemIndex = x.count - 1
+        for i in 0..<lastElemIndex {
+            y[i] = (x[i] >> shift) | (x[i + 1] << (bitWidth - shift))
+        }
+        y[lastElemIndex] = x[lastElemIndex] >> shift
+    }
+    
+    
+    private static func divide(_ x: [Digit], by y: Digit, result z: inout [Digit]) -> Digit {
+        assert(x.count == z.count)
+        assert(x.startIndex == z.startIndex)
+        
+        var r: Digit = 0
+        var i = x.count - 1
+        
+        (z[i], r) = x[i].quotientAndRemainder(dividingBy: y)
+        i -= 1
+        
+        while i >= 0 {
+            (z[i], r) = y.dividingFullWidth((r, x[i]))
+            i -= 1
+        }
+        return r
+    }
+        
+    private static func subtractReportingBorrow(_ x: [Digit], times k: Digit, from y: inout ArraySlice<Digit>) -> Bool {
+        assert(x.count + 1 <= y.count)
+        
+        func subtractReportingBorrow(_ x: inout Digit, _ y: Digit) -> Digit {
+            let b: Bool
+            (x, b) = x.subtractingReportingOverflow(y)
+            return Digit(b)
+        }
+        
+        var i = x.startIndex
+        var j = y.startIndex
+
+        var borrow: Digit = 0
+        while i < x.endIndex {
+            borrow = subtractReportingBorrow(&y[j], borrow)
+            let (pHi, pLo) = k.multipliedFullWidth(by: x[i])
+            borrow &+= pHi
+            borrow &+= subtractReportingBorrow(&y[j], pLo)
+            
+            i &+= 1
+            j &+= 1
+        }
+        return 0 != subtractReportingBorrow(&y[j], borrow)
+    }
+    
+    private static func divideWithRemainder_KnuthD(_ dividend: (high:UInt128, low:UInt128), by divisor: UInt128) ->
+    (quotient: [Digit], remainder: [Digit]) {
+        assert(divisor != 0, "Division by 0")
+        
+        let digitWidth = Digit.bitWidth
+        let dividend = dividend.low.words + dividend.high.words
+        let divisor =  divisor.words
+        let m = dividend.count
+        let n = divisor.count
+        
+        assert(n > 0, "Divisor must have at least one digit")
+        assert(m >= n, "Dividend must have at least as many digits as the divisor")
+
+        var quotient = [Digit](repeating: 0, count: m-n+1)
+        var remainder = [Digit](repeating: 0, count: n)
+        
+        guard n > 1 else {
+            remainder[0] = divide(dividend, by: divisor.first!, result: &quotient)
+            return (quotient, remainder)
+        }
+        
+        let shift = divisor.last!.leadingZeroBitCount
+        
+        var v = [Digit](repeating: 0, count: n)
+        leftShift(divisor, by: shift, into: &v)
+
+        var u = [Digit](repeating: 0, count: m + 1)
+        u[m] = dividend[m - 1] >> (digitWidth - shift)
+        leftShift(dividend, by: shift, into: &u)
+        
+        let vLast: Digit = v.last!
+        let vNextToLast: Digit = v[n - 2]
+        let partialDividendDelta: TwoDigits = (high: vLast, low: 0)
+
+        for j in (0...(m - n)).reversed() {
+            let jPlusN = j &+ n
+            
+            let dividendHead: TwoDigits = (high: u[jPlusN], low: u[jPlusN &- 1])
+            
+            // These are tuple arithemtic operations.  `/%` is custom combined
+            // division and remainder operator.  See above.
+            var (q̂, r̂) = dividendHead /% vLast
+            var partialProduct = q̂ * vNextToLast
+            var partialDividend:TwoDigits = (high: r̂.low, low: u[jPlusN &- 2])
+            
+            while true {
+                if (UInt8(q̂.high != 0) | (partialProduct > partialDividend)) == 1 {
+                    q̂ -= 1
+                    r̂ += vLast
+                    partialProduct -= vNextToLast
+                    partialDividend += partialDividendDelta
+                    
+                    if r̂.high == 0 { continue }
+                }
+                break
+            }
+
+            quotient[j] = q̂.low
+            
+            if subtractReportingBorrow(Array(v[0..<n]), times: q̂.low, from: &u[j...jPlusN]) {
+                quotient[j] &-= 1
+                u[j...jPlusN] += v[0..<n] // digit collection addition!
+            }
+        }
+        
+        rightShift(Array(u[0..<n]), by: shift, into: &remainder)
+        return (quotient, remainder)
+    }
 }
 
 // MARK: - BinaryFloatingPoint Interoperability

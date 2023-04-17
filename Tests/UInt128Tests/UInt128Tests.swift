@@ -1122,7 +1122,7 @@ final class BasicUInt128Tests: XCTestCase {
         let y = UInt128(100_000_000)
         self.measure {
             for _ in 1...100 {
-                let z = x * y
+                let _ = x * y
             }
         }
     }
@@ -1133,7 +1133,7 @@ final class BasicUInt128Tests: XCTestCase {
         let y = UInt128(100_000_000)
         self.measure {
             for _ in 1...100 {
-                let z = x / y
+                let _ = x / y
             }
         }
     }
@@ -1142,7 +1142,7 @@ final class BasicUInt128Tests: XCTestCase {
         // UInt128 from String is 39X faster than UInt128 from Gerber
         self.measure {
             for _ in 1...100 {
-                let x = UInt128("123_456_789_012_345_678_901_234_567_890")
+                let _ = UInt128("123_456_789_012_345_678_901_234_567_890")
             }
         }
     }
@@ -1151,7 +1151,7 @@ final class BasicUInt128Tests: XCTestCase {
         // UInt128 to String is 381X faster than UInt128 from Gerber
         self.measure {
             for _ in 1...100 {
-                let x = UInt128.max.description
+                let _ = UInt128.max.description
             }
         }
     }

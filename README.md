@@ -4,7 +4,7 @@ A 128-bit unsigned integer implementation with optimized multiplication, divisio
 This package supports the new **StaticBigInt** on macOS 13.3+ or iOS 16.4+. Please see FIXME in the source
 since there seems to be no way to fake support for StaticBigInt on lower OS versions without resorting to
 commenting out alternate ExpressibleByIntegerLiteral implementations. 
-I **really** tried to get this to work automagically -- but failed.
+I **really** tried to get this to work automagically — but failed.
 
 This package is usually one or more orders of magnitude faster than any other UInt128 implementations.
 If you find something faster, please let me know.
