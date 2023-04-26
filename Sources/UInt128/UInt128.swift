@@ -2,20 +2,20 @@ import Foundation
 import Charts
 
 /**
-Copyright © 2023 Computer Inspirations. All rights reserved.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+ Copyright © 2023 Computer Inspirations. All rights reserved.
+ 
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+ 
+ http://www.apache.org/licenses/LICENSE-2.0
+ 
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+ */
 
 ///
 ///  The **UInt128** type provides a Swift-based implementation of a 128-bit unsigned integer.
@@ -24,775 +24,905 @@ limitations under the License.
 ///
 ///  Created by Mike Griebling on 17 Apr 2023
 ///
-public struct UInt128 : Sendable {
-    
-    /// This gets used quite a bit so provide a prebuilt value
-    static public let zero = (UInt64(0), UInt64(0))
-    
-    /// Internal data representation - pretty simple
-    var value : (highBits:UInt64, lowBits:UInt64)
-    
-    //////////////////////////////////////////////////////////////////////////////////////////
-    // MARK: - Initializers
-    
-    public init(high: UInt64, low: UInt64) {
-        value.highBits = high
-        value.lowBits  = low
-    }
-    
-    public init() {
-        self = Self.zero
-    }
-    
-    private init(_ digits: [Digit]) {
-        self.init(high: UInt64(digits[1]), low: UInt64(digits[0]))
-    }
-}
+public struct UInt128 : Sendable, Codable {
+  internal typealias High = UInt64
+  internal typealias Low = UInt64
 
-//////////////////////////////////////////////////////////////////////////////////////////
-// MARK: - Codable compliance
+  /// Internal data representation - pretty simple
+  var high: High, low: Low
+  
+  //////////////////////////////////////////////////////////////////////////////////////////
+  // MARK: - Initializers
+  
+  /// Creates a new instance from the given tuple of high and low parts.
+  ///
+  /// - Parameter value: The tuple to use as the source of the new instance's
+  ///   high and low parts.
+  internal init(_ value: (high: High, low: Low)) {
+    self.low = value.low
+    self.high = value.high
+  }
 
-extension UInt128 : Codable {
-    
-    enum CodingKeys: String, CodingKey {
-        case highWord, lowWord
-    }
-    
-    public init(from decoder: Decoder) throws {
-        let values = try decoder.container(keyedBy: CodingKeys.self)
-        let high = try values.decode(UInt64.self, forKey: .highWord)
-        let low = try values.decode(UInt64.self, forKey: .lowWord)
-        value = (high, low)
-    }
-    
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(value.highBits, forKey: .highWord)
-        try container.encode(value.lowBits, forKey: .lowWord)
-    }
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////
-// MARK: - Hashable compliance
-
-extension UInt128 : Hashable {
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(value.highBits)
-        hasher.combine(value.lowBits)
-    }
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////
-// MARK: - ExpressibleByIntegerLiteral compliance
-
-extension UInt128 : ExpressibleByIntegerLiteral {
-    
-    // FIXME: - Please uncomment if your OS supports the StaticBigInt
-    // You'll also need to comment out the Int version.
-//    @available(macOS 13.3, *)
-//    public init(integerLiteral value: StaticBigInt) {
-//        precondition(
-//            value.signum() >= 0 && value.bitWidth <= Self.bitWidth + 1,
-//            "'\(value)' has too many digits for '\(Self.self)'"
-//        )
-//        self.init(high: UInt64(value[1]), low: UInt64(value[0]))
-//    }
-    
-    public init(integerLiteral value: Int) {
-        self.init(high: 0, low: UInt64(value))
-    }
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////
-// MARK: - Comparable and Equatable compliance
-
-extension UInt128 : Comparable, Equatable {
-    
-    static public func < (lhs: UInt128, rhs: UInt128) -> Bool {
-        if lhs.value.highBits < rhs.value.highBits {
-            return true
-        } else if lhs.value.highBits == rhs.value.highBits && lhs.value.lowBits < rhs.value.lowBits {
-            return true
-        }
-        return false
-    }
-    
-    static public func == (lhs: UInt128, rhs: UInt128) -> Bool {
-        if lhs.value.lowBits == rhs.value.lowBits && lhs.value.highBits == rhs.value.highBits {
-            return true
-        }
-        return false
-    }
+  public init(high: UInt64, low: UInt64) {
+    self.high = high
+    self.low  = low
+  }
+  
+  public init() {
+    self.init(high: 0, low: 0)
+  }
+  
+  /// This gets used quite a bit so provide a prebuilt value
+  static public var zero: Self { Self(high: 0, low: 0 ) }
+  static public var one:  Self { Self(high: 0, low: 1 ) }
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
 // MARK: - CustomStringConvertible and CustomDebugStringConvertible compliance
 
-extension UInt128 : CustomStringConvertible, CustomDebugStringConvertible {
-    
-    /// Divides `x` by rⁿ where r is the `radix`. Returns the quotient, remainder, and digits
-    private static func div (x: UInt128, radix: Int) -> (q:UInt128, r:UInt64, digits:Int) {
-        let maxDivisor: UInt64
-        let digits: Int
-        switch radix {
-            case 2:  maxDivisor = UInt64(9_223_372_036_854_775_808); digits = 63
-            case 8:  maxDivisor = UInt64(9_223_372_036_854_775_808); digits = 21
-            case 16: maxDivisor = UInt64(1_152_921_504_606_846_976); digits = 15
-            case 10: maxDivisor = UInt64(10_000_000_000_000_000_000); digits = 19
-            default:
-                // Note: Max radix = 36 so 36¹² = 4_738_381_338_321_616_896 < UInt64.max
-                var power = radix*radix         // squared
-                power *= power                  // 4th power
-                power = power * power * power   // 12th power
-                maxDivisor = UInt64(power); digits = 12
-        }
-        let result = x.quotientAndRemainder(dividingBy: UInt128(high: 0, low: maxDivisor))
-        return (result.quotient, result.remainder.value.lowBits, digits)
+extension UInt128 : CustomStringConvertible {
+  
+  /// Divides `x` by rⁿ where r is the `radix`. Returns the quotient, remainder, and digits
+  private static func div (x: UInt128, radix: Int) -> (q:UInt128, r:UInt64, digits:Int) {
+    let maxDivisor: UInt64
+    let digits: Int
+    switch radix {
+      case 2:  maxDivisor = UInt64(9_223_372_036_854_775_808); digits = 63
+      case 8:  maxDivisor = UInt64(9_223_372_036_854_775_808); digits = 21
+      case 16: maxDivisor = UInt64(1_152_921_504_606_846_976); digits = 15
+      case 10: maxDivisor = UInt64(10_000_000_000_000_000_000); digits = 19
+      default:
+        // Note: Max radix = 36 so 36¹² = 4_738_381_338_321_616_896 < UInt64.max
+        var power = radix*radix         // squared
+        power *= power                  // 4th power
+        power = power * power * power   // 12th power
+        maxDivisor = UInt64(power); digits = 12
     }
-    
-    /// Converts the UInt128 `self` into a string with a given `radix`.  The radix
-    /// string can use uppercase characters if `uppercase` is true.
-    ///
-    /// Why convert numbers in chunks?  This approach reduces the number of calls
-    /// to division and modulo functions so is more efficient than a naïve digit-based approach.
-    public func string(withRadix radix:Int = 10, uppercase:Bool = false) -> String {
-        if self == Self.zero { return "0" }
-        let radix = Swift.min(radix, 36)
-        var result = (q:self, r:UInt64(0), digits:0)
-        var str = ""
-        while result.q != Self.zero {
-            result = Self.div(x: result.q, radix: radix)
-            var temp = String(result.r, radix: radix, uppercase: uppercase)
-            if result.q != Self.zero {
-                temp = "".padding(toLength: result.digits-temp.count, withPad: "0", startingAt: 0) + temp
-            }
-            str = temp + str
-        }
-        return str
+    let result = x.quotientAndRemainder(dividingBy: UInt128(high: 0, low: maxDivisor))
+    return (result.quotient, result.remainder.low, digits)
+  }
+  
+  /// Converts the UInt128 `self` into a string with a given `radix`.  The radix
+  /// string can use uppercase characters if `uppercase` is true.
+  ///
+  /// Why convert numbers in chunks?  This approach reduces the number of calls
+  /// to division and modulo functions so is more efficient than a naïve digit-based approach.
+  public func string(withRadix radix:Int = 10, uppercase:Bool = false) -> String {
+    if self == Self.zero { return "0" }
+    let radix = Swift.min(radix, 36)
+    var result = (q:self, r:UInt64(0), digits:0)
+    var str = ""
+    while result.q != Self.zero {
+      result = Self.div(x: result.q, radix: radix)
+      var temp = String(result.r, radix: radix, uppercase: uppercase)
+      if result.q != Self.zero {
+        temp = "".padding(toLength: result.digits-temp.count, withPad: "0", startingAt: 0) + temp
+      }
+      str = temp + str
     }
-    
-    public var description: String { string() }
-    public var debugDescription: String { string() }
+    return str
+  }
+  
+  public var description: String {
+    self.string()
+  }
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////
-// MARK: - ExpressibleByStringLiteral compliance
+extension UInt128: CustomDebugStringConvertible {
+  public var debugDescription: String {
+    description
+  }
+}
 
-extension UInt128 : ExpressibleByStringLiteral {
-    
-    public init(stringLiteral s: String) {
-        self.init()
-        if let newValue = value(from: s) {
-            self = newValue
-        }
+extension UInt128: ExpressibleByStringLiteral {
+  
+  public init(stringLiteral s: String) {
+    self.init()
+    if let newValue = Self.value(from: s) {
+      self = newValue
     }
-
-    public init?(_ string: String, radix: Int = 10) {
-        if string.isEmpty { return nil }
-        self.init()
-        if let x = value(from: string, radix: radix) {
-            self = x; return
+  }
+  
+  public init?<S: StringProtocol>(_ text: S, radix: Int = 10) {
+    guard !text.isEmpty else { return nil }
+    self.init()
+    if let x = UInt128.value(from: text, radix: radix) {
+      self = x
+    } else {
+      return nil
+    }
+  }
+  
+  /// This method breaks `string` into pieces to reduce overhead of the
+  /// multiplications and allow UInt64 to work in converting larger numbers.
+  private static func value<S: StringProtocol>(from string: S, radix: Int = 10) -> UInt128? {
+    // Do our best to clean up the input string
+    var radix = UInt64(radix)
+    var s = string.components(separatedBy: CharacterSet.whitespaces).joined()
+    if s.hasPrefix("+") { s.removeFirst() }
+    if s.hasPrefix("-") { return nil }
+    if s.hasPrefix("0x") { s.removeFirst(2); radix = 16 }
+    if s.hasPrefix("0b") { s.removeFirst(2); radix = 2 }
+    if s.hasPrefix("0o") { s.removeFirst(2); radix = 8 }
+    while s.hasPrefix("0") { s.removeFirst() }
+    
+    // Translate the string into a number
+    var r = UInt128()
+    let _ = UInt128.timesOne(to: 1, x: UInt128.zero, radix: radix)  // initialize the table
+    while !s.isEmpty {
+      // remove 18 digits at a time
+      let chunk = s.prefix(Self.powers.count)
+      let size = chunk.count; s.removeFirst(size)
+      if let uint = UInt64(chunk, radix: Int(radix)) {
+        if size != 0 {
+          r = Self.timesOne(to: size, x: r, radix: radix)
         }
+        r += UInt128(high: 0, low: uint)
+      } else {
         return nil
+      }
     }
-    
-    /// This method breaks `string` into pieces to reduce overhead of the
-    /// multiplications and allow UInt64 to work in converting larger numbers.
-    private func value(from string: String, radix: Int = 10) -> UInt128? {
-        // Do our best to clean up the input string
-        let spaces = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "_"))
-        var radix = UInt64(radix)
-        var s = string.components(separatedBy: spaces).joined()
-        if s.hasPrefix("+") { s.removeFirst() }
-        if s.hasPrefix("-") { return nil }
-        if s.hasPrefix("0x") { s.removeFirst(2); radix = 16 }
-        if s.hasPrefix("0b") { s.removeFirst(2); radix = 2 }
-        if s.hasPrefix("0o") { s.removeFirst(2); radix = 8 }
-        while s.hasPrefix("0") { s.removeFirst() }
-        
-        // Translate the string into a number
-        var r = UInt128()
-        let _ = Self.timesOne(to: 1, x: Self.zero, radix: radix)  // initialize the table
-        while !s.isEmpty {
-            // remove 18 digits at a time
-            let chunk = s.prefix(Self.powers.count)
-            let size = chunk.count; s.removeFirst(size)
-            if let uint = UInt64(chunk, radix: Int(radix)) {
-                if size != 0 {
-                    r = Self.timesOne(to: size, x: r, radix: radix)
-                }
-                r += UInt128(high: 0, low: uint)
-            } else {
-                return nil
-            }
-        }
-        return r
+    return r
+  }
+  
+  /// Precomputed powers of rⁿ where r is the radix up to UInt64.max
+  static var powers = [UInt64]()
+  
+  /// Multiplies `x` by rⁿ where r is the `radix` and returns the product
+  private static func timesOne(to n: Int, x: UInt128, radix: UInt64) -> UInt128 {
+    // calculate the powers of the radix and store in a table — you'll thank me later
+    if powers.isEmpty || powers.first! != radix {
+      powers = [UInt64]()
+      var x = UInt64(1)
+      while x < UInt64.max / radix {
+        x *= radix
+        powers.append(x)
+      }
     }
-    
-    /// Precomputed powers of rⁿ where r is the radix up to UInt64.max
-    static var powers = [UInt64]()
-    
-    /// Multiplies `x` by rⁿ where r is the `radix` and returns the product
-    private static func timesOne(to n: Int, x: UInt128, radix: UInt64) -> UInt128 {
-        // calculate the powers of the radix and store in a table — you'll thank me later
-        if powers.isEmpty || powers.first! != radix {
-            powers = [UInt64]()
-            var x = UInt64(1)
-            while x < UInt64.max / radix {
-                x *= radix
-                powers.append(x)
-            }
-        }
-        let oneToPower = Self.powers[n-1]
-        let result = x * UInt128(high:0, low:oneToPower)
-        return result
-    }
+    let oneToPower = Self.powers[n-1]
+    let result = x * UInt128(high:0, low:oneToPower)
+    return result
+  }
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
-// MARK: - BinaryInteger compliance
-
-extension UInt128 : BinaryInteger {
-
-    public typealias Words = [UInt]
-    
-    // MARK: - Class properties
-    
-    public static let bitWidth = 128
-    
-    // MARK: - Instance properties
-
-    public var words: Words { Array(value.lowBits.words) + Array(value.highBits.words) }
-    public var magnitude: UInt128 { self }
-    public var bitWidth: Int { value.highBits.bitWidth + value.lowBits.bitWidth }
-    
-    public var trailingZeroBitCount: Int {
-        if value.lowBits == 0 {
-            return value.highBits.trailingZeroBitCount + value.lowBits.bitWidth
-        }
-        return value.lowBits.trailingZeroBitCount
-    }
-    
-    public var leadingZeroBitCount: Int {
-        if value.highBits == 0 {
-            return value.lowBits.leadingZeroBitCount + value.highBits.bitWidth
-        }
-        return value.highBits.leadingZeroBitCount
-    }
-    
-    // MARK: - Initializers
-    
-    public init?<T>(exactly source: T) where T : BinaryFloatingPoint {
-        if source.isZero { self = UInt128(); return }
-        guard source.exponent >= 0 && source.rounded() == source else { return nil }
-        self = UInt128(UInt64(source))
-    }
-    
-    public init<T>(_ source: T) where T : BinaryFloatingPoint {
-        self.init(high: 0, low: UInt64(source))
-    }
-    
-    public init<T>(_ source: T) where T : BinaryInteger {
-        if let n = source as? Self { self = n; return }
-        self.init(high: 0, low: UInt64(source))
-    }
-    
-    public init<T>(truncatingIfNeeded source: T) where T : BinaryInteger {
-        if let n = source as? Self { self = n; return }
-        if source.signum() < 0 {
-            // negative numbers must be sign-extended
-            let mag = UInt128(source.magnitude)
-            let num = UInt128.max - mag
-            self = num
-            return
-        }
-        self.init(high: 0, low: UInt64(source))
-    }
-    
-    public init<T>(clamping source: T) where T : BinaryInteger {
-        if let n = source as? Self { self = n; return }
-        guard source >= 0 else { self = Self.min; return }
-        guard source.bitWidth <= Self.bitWidth else { self = Self.max; return }
-        self.init(high: 0, low: UInt64(source))
-    }
-    
-    // MARK: - Basic Mathematical Operations
-    public static func + (lhs: UInt128, rhs: UInt128) -> UInt128 {
-        let result = lhs.addingReportingOverflow(rhs)
-        assert(!result.overflow, "Overflow during addition!")
-        return result.partialValue
-    }
-    
-    public static func - (lhs: UInt128, rhs: UInt128) -> UInt128 {
-        let result = lhs.subtractingReportingOverflow(rhs)
-        assert(!result.overflow, "Underflow during subtraction!")
-        return result.partialValue
-    }
-    
-    public static func * (lhs: UInt128, rhs: UInt128) -> UInt128 {
-        // Multiplies the lhs by the rhs.value.lowBits and reports overflow
-        let result = lhs.multipliedReportingOverflow(by: rhs)
-        assert(!result.overflow, "Multiplication overflow")
-        return result.partialValue
-    }
-    
-    public static func / (lhs: UInt128, rhs: UInt128) -> UInt128 {
-        //let result = divRemAbs(lhs.toInteger(), w1: rhs.toInteger())
-        let result = divideWithRemainder_KnuthD((0, lhs), by: rhs).quotient
-        return UInt128(result)
-    }
-
-    public static func % (lhs: UInt128, rhs: UInt128) -> UInt128 {
-        // let result = divRemAbs(lhs.toInteger(), w1: rhs.toInteger())
-        let result = divideWithRemainder_KnuthD((0, lhs), by: rhs).remainder
-        return UInt128(result)
-    }
-
-    public func quotientAndRemainder (dividingBy rhs: UInt128) -> (quotient: UInt128, remainder: UInt128) {
-        // let result = Self.divRemAbs(self.toInteger(), w1: rhs.toInteger())
-        let result = Self.divideWithRemainder_KnuthD((0, self), by: rhs)
-        return (UInt128(result.quotient), UInt128(result.remainder))
-    }
-    
-    
-    // MARK: - Convenience math functions
-    public static func /= (lhs: inout UInt128, rhs: UInt128) { lhs = lhs / rhs }
-    public static func %= (lhs: inout UInt128, rhs: UInt128) { lhs = lhs % rhs }
-    public static func *= (lhs: inout UInt128, rhs: UInt128) { lhs = lhs * rhs }
-    
-    // MARK: - Logical functions
-    public static func & (lhs: UInt128, rhs: UInt128) -> UInt128 {
-        let lhs = lhs.value; let rhs = rhs.value
-        return UInt128(high:lhs.highBits & rhs.highBits, low: lhs.lowBits & rhs.lowBits)
-    }
-    
-    public static func | (lhs: UInt128, rhs: UInt128) -> UInt128 {
-        let lhs = lhs.value; let rhs = rhs.value
-        return UInt128(high: lhs.highBits | rhs.highBits, low: lhs.lowBits | rhs.lowBits)
-    }
-    
-    public static func ^ (lhs: UInt128, rhs: UInt128) -> UInt128 {
-        let lhs = lhs.value; let rhs = rhs.value
-        return UInt128(high: lhs.highBits ^ rhs.highBits, low: lhs.lowBits ^ rhs.lowBits)
-    }
-    
-    public static func &= (lhs: inout UInt128, rhs: UInt128) { lhs = lhs & rhs }
-    public static func |= (lhs: inout UInt128, rhs: UInt128) { lhs = lhs | rhs }
-    public static func ^= (lhs: inout UInt128, rhs: UInt128) { lhs = lhs ^ rhs }
-    
-    // MARK: - Shifting functions
-    public static func >> <RHS>(lhs: UInt128, rhs: RHS) -> UInt128 where RHS : BinaryInteger {
-        if rhs.signum() < 0 { return lhs << rhs.magnitude }
-        if rhs >= Self.bitWidth { return Self.zero }
-        if rhs >= UInt64.bitWidth {
-            return UInt128(high: 0, low: lhs.value.highBits >> (Int(rhs)-UInt64.bitWidth))
-        } else {
-            let shiftOut = lhs.value.highBits << (UInt64.bitWidth-Int(rhs))
-            return UInt128(high: lhs.value.highBits >> rhs, low: lhs.value.lowBits >> rhs | shiftOut)
-        }
-    }
-    
-    public static func << <RHS>(lhs: UInt128, rhs: RHS) -> UInt128 where RHS : BinaryInteger {
-        if rhs.signum() < 0 { return lhs >> rhs.magnitude }
-        if rhs >= Self.bitWidth { return Self.zero }
-        if rhs >= UInt64.bitWidth {
-            return UInt128(high: lhs.value.lowBits << (Int(rhs)-UInt64.bitWidth), low: 0)
-        } else {
-            let shiftOut = lhs.value.lowBits >> (UInt64.bitWidth-Int(rhs))
-            return UInt128(high: lhs.value.highBits << rhs | shiftOut, low: lhs.value.lowBits << rhs)
-        }
-    }
-    
-    public static func >>= <RHS>(lhs: inout UInt128, rhs: RHS) where RHS : BinaryInteger {
-        lhs = lhs >> rhs
-    }
-    
-    public static func &>>= <RHS>(lhs: inout UInt128, rhs: RHS) where RHS : BinaryInteger {
-        lhs = lhs >> (rhs & RHS(UInt128.bitWidth-1))
-    }
-    
-    public static func <<= <RHS>(lhs: inout UInt128, rhs: RHS) where RHS : BinaryInteger {
-        lhs = lhs << rhs
-    }
-    
-    public static func &<<= <RHS>(lhs: inout UInt128, rhs: RHS) where RHS : BinaryInteger {
-        lhs = lhs << (rhs & RHS(UInt128.bitWidth-1))
-    }
+// MARK: - Equatable compliance
+extension UInt128: Equatable {
+  public static func == (_ lhs: Self, _ rhs: Self) -> Bool {
+    return (lhs.high, lhs.low) == (rhs.high, rhs.low)
+  }
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
-// MARK: - UnsignedInteger, LosslessStringConvertible, Strideable, Numeric, AdditiveArithmetic compliance
+// MARK: - Comparable compliance
+extension UInt128: Comparable {
+  public static func < (_ lhs: Self, _ rhs: Self) -> Bool {
+    (lhs.high, lhs.low) < (rhs.high, rhs.low)
+  }
+}
 
-extension UInt128 : UnsignedInteger { }
+//////////////////////////////////////////////////////////////////////////////////////////
+// MARK: - hashable compliance
+extension UInt128: Hashable {
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(low)
+    hasher.combine(high)
+  }
+}
 
-extension UInt128 : LosslessStringConvertible { }
+extension UInt128 {
+  internal var components: (high: High, low: Low) {
+    @inline(__always) get { (high, low) }
+    @inline(__always) set { (self.high, self.low) = (newValue.high, newValue.low) }
+  }
+}
 
-extension UInt128 : Strideable { }
+//////////////////////////////////////////////////////////////////////////////////////////
+// MARK: - AdditiveArithmetic compliance
+
+extension UInt128: AdditiveArithmetic {
+  
+  public static func + (lhs: Self, rhs: Self) -> Self {
+    let (result, overflow) = lhs.addingReportingOverflow(rhs)
+    precondition(!overflow, "Overflow in +")
+    return result
+  }
+  
+  public static func += (lhs: inout Self, rhs: Self) {
+    let (result, overflow) = lhs.addingReportingOverflow(rhs)
+    precondition(!overflow, "Overflow in +=")
+    lhs = result
+  }
+  
+  public static func - (lhs: UInt128, rhs: UInt128) -> UInt128 {
+    let (result, overflow) = lhs.subtractingReportingOverflow(rhs)
+    precondition(!overflow, "Overflow in -")
+    return result
+  }
+  
+  public static func -= (lhs: inout Self, rhs: Self) {
+    let (result, overflow) = lhs.subtractingReportingOverflow(rhs)
+    precondition(!overflow, "Overflow in -=")
+    lhs = result
+  }
+}
+
+/////////////////////////////////////////////////////////////////////
+// MARK: - Numeric compliance
 
 extension UInt128 : Numeric {
-    public init?<T>(exactly source: T) where T : BinaryInteger {
-        guard source.bitWidth <= Self.bitWidth else { return nil }
-        self.init(high: 0, low: UInt64(source))
+  
+  public typealias Magnitude = UInt128
+  
+  public var magnitude: Magnitude {
+    return self
+  }
+  
+  public init(_ magnitude: Magnitude) {
+    self.init(high: High(magnitude.high), low: Low(magnitude.low))
+  }
+  
+  public init<T: BinaryInteger>(_ source: T) {
+    guard let result = Self(exactly: source) else {
+      preconditionFailure("Value is outside the representable range")
     }
+    self = result
+  }
+  
+  public init?<T: BinaryInteger>(exactly source: T) {
+    // Can't represent a negative 'source' if Self is unsigned.
+    guard Self.isSigned || source >= 0 else {
+      return nil
+    }
+    
+    // Is 'source' entirely representable in Low?
+    if let low = Low(exactly: source.magnitude) {
+      self.init(source._isNegative ? (~0, low._twosComplement) : (0, low))
+    } else {
+      // At this point we know source.bitWidth > High.bitWidth, or else we
+      // would've taken the first branch.
+      let lowInT = source & T(~0 as Low)
+      let highInT = source >> Low.bitWidth
+      
+      let low = Low(lowInT)
+      guard let high = High(exactly: highInT) else {
+        return nil
+      }
+      self.init(high: high, low: low)
+    }
+  }
+  
+  public static func * (lhs: UInt128, rhs: UInt128) -> UInt128 {
+    // Multiplies the lhs by the rhs.low and reports overflow
+    let (result, overflow) = lhs.multipliedReportingOverflow(by: rhs)
+    precondition(!overflow, "Overflow in *")
+    return result
+  }
+  
+  public static func *= (lhs: inout UInt128, rhs: UInt128) {
+    let (result, overflow) = lhs.multipliedReportingOverflow(by: rhs)
+    precondition(!overflow, "Overflow in *")
+    lhs = result
+  }
 }
 
-extension UInt128 : AdditiveArithmetic { }
+extension UInt128 {
+  public struct Words {
+    var value: UInt128
+    
+    init(value: UInt128) {
+      self.value = value
+    }
+  }
+}
+
+extension UInt128.Words: RandomAccessCollection {
+  public typealias Element = UInt
+  public typealias Index = Int
+  public typealias Indices = Range<Int>
+  
+  public var count: Int { 128 / UInt.bitWidth }
+  public var startIndex: Int { 0 }
+  public var endIndex: Int { count }
+  public var indices: Range<Int> { startIndex ..< endIndex }
+  public func index(after i: Int) -> Int { i + 1 }
+  public func index(before i: Int) -> Int { i - 1 }
+  
+  public subscript(position: Int) -> UInt {
+    get {
+      precondition(position >= 0 && position < endIndex,
+                   "Word index out of range")
+      let shift = position &* UInt.bitWidth
+      precondition(shift < UInt128.bitWidth)
+
+      let r = _wideMaskedShiftRight(
+        value.components, UInt64(truncatingIfNeeded: shift))
+      return r.low._lowWord
+    }
+  }
+}
+
+extension UInt128: FixedWidthInteger {
+
+  public var _lowWord: UInt {
+    low._lowWord
+  }
+  
+  public var words: Words {
+    Words(value: self)
+  }
+  
+  public static var isSigned: Bool { false }
+  public static var max: Self { self.init(high: High.max, low: Low.max) }
+  public static var min: Self { self.init(high: High.min, low: Low.min) }
+  public static var bitWidth: Int { 128 }
+  
+  public func addingReportingOverflow(_ rhs: Self) ->
+        (partialValue: Self, overflow: Bool) {
+    let (r, o) = _wideAddReportingOverflow22(self.components, rhs.components)
+    return (Self(r), o)
+  }
+  
+  public func subtractingReportingOverflow(_ rhs: Self) ->
+        (partialValue: Self, overflow: Bool) {
+    let (r, o) =
+      _wideSubtractReportingOverflow22(self.components, rhs.components)
+    return (Self(r), o)
+  }
+  
+  public func multipliedReportingOverflow(by rhs: Self) ->
+      (partialValue: Self, overflow: Bool) {
+    let h1 = self.high.multipliedReportingOverflow(by: rhs.low)
+    let h2 = self.low.multipliedReportingOverflow(by: rhs.high)
+    let h3 = h1.partialValue.addingReportingOverflow(h2.partialValue)
+    let (h, l) = self.low.multipliedFullWidth(by: rhs.low)
+    let high = h3.partialValue.addingReportingOverflow(h)
+    let overflow = ((self.high != 0 && rhs.high != 0)
+      || h1.overflow || h2.overflow || h3.overflow || high.overflow)
+    return (Self(high: high.partialValue, low: l), overflow)
+  }
+
+  /// Returns the product of this value and the given 64-bit value, along with a
+  /// Boolean value indicating whether overflow occurred in the operation.
+  public func multipliedReportingOverflow(by other: UInt64) ->
+      (partialValue: Self, overflow: Bool) {
+    let h1 = self.high.multipliedReportingOverflow(by: other)
+    let (h2, l) = self.low.multipliedFullWidth(by: other)
+    let high = h1.partialValue.addingReportingOverflow(h2)
+    let overflow = h1.overflow || high.overflow
+    return (Self(high: high.partialValue, low: l), overflow)
+  }
+  
+  public func multiplied(by other: UInt64) -> Self {
+    let r = multipliedReportingOverflow(by: other)
+    precondition(!r.overflow, "Overflow in multiplication")
+    return r.partialValue
+  }
+
+  public func quotientAndRemainder(dividingBy other: Self) ->
+      (quotient: Self, remainder: Self) {
+    let (q, r) = _wideDivide22(self.magnitude.components,
+                               by: other.magnitude.components)
+    let quotient = Self.Magnitude(q)
+    let remainder = Self.Magnitude(r)
+    return (quotient, remainder)
+  }
+  
+  public func dividedReportingOverflow(by other: Self) ->
+      (partialValue: Self, overflow: Bool) {
+    if other == Self.zero {
+      return (self, true)
+    }
+    if Self.isSigned && other == -1 && self == .min {
+      return (self, true)
+    }
+    return (quotientAndRemainder(dividingBy: other).quotient, false)
+  }
+
+  public func remainderReportingOverflow(dividingBy other: Self) ->
+      (partialValue: Self, overflow: Bool) {
+    if other == Self.zero {
+      return (self, true)
+    }
+    if Self.isSigned && other == -1 && self == .min {
+      return (0, true)
+    }
+    return (quotientAndRemainder(dividingBy: other).remainder, false)
+  }
+
+  public func multipliedFullWidth(by other: Self) ->
+      (high: Self, low: Magnitude) {
+    let isNegative = Self.isSigned && (self._isNegative != other._isNegative)
+
+    func sum(_ x: Low, _ y: Low) -> (high: Low, low: Low) {
+      let (sum, overflow) = x.addingReportingOverflow(y)
+      return (overflow ? 1 : 0, sum)
+    }
+
+    func sum(_ x: Low, _ y: Low, _ z: Low) -> (high: Low, low: Low) {
+      let s1 = sum(x, y)
+      let s2 = sum(s1.low, z)
+      return (s1.high &+ s2.high, s2.low)
+    }
+
+    func sum(_ x0: Low, _ x1: Low, _ x2: Low, _ x3: Low) ->
+        (high: Low, low: Low) {
+      let s1 = sum(x0, x1)
+      let s2 = sum(x2, x3)
+      let s = sum(s1.low, s2.low)
+      return (s1.high &+ s2.high &+ s.high, s.low)
+    }
+
+    let lhs = self.magnitude
+    let rhs = other.magnitude
+
+    let a = rhs.low.multipliedFullWidth(by: lhs.low)
+    let b = rhs.low.multipliedFullWidth(by: lhs.high)
+    let c = rhs.high.multipliedFullWidth(by: lhs.low)
+    let d = rhs.high.multipliedFullWidth(by: lhs.high)
+
+    let mid1 = sum(a.high, b.low, c.low)
+    let mid2 = sum(b.high, c.high, mid1.high, d.low)
+
+    // Note: this addition will never wrap
+    let high = UInt128(high: High(d.high &+ mid2.high), low: mid2.low)
+    let low = UInt128(high: mid1.low, low: a.low)
+
+    if isNegative {
+      let (lowComplement, overflow) = (~low).addingReportingOverflow(.one)
+      return (~high + (overflow ? 1 : 0), lowComplement)
+    } else {
+      return (high, low)
+    }
+  }
+
+  public func dividingFullWidth(_ dividend: (high: Self, low: Self.Magnitude))
+      -> (quotient: Self, remainder: Self) {
+    let (q, r) = _wideDivide42((dividend.high.components,
+                                dividend.low.components), by: self.components)
+    return (Self(q), Self(r))
+  }
+  
+  public static func &= (lhs: inout Self, rhs: Self) {
+    lhs.low &= rhs.low
+    lhs.high &= rhs.high
+  }
+  
+  public static func |= (lhs: inout Self, rhs: Self) {
+    lhs.low |= rhs.low
+    lhs.high |= rhs.high
+  }
+  
+  public static func ^= (lhs: inout Self, rhs: Self) {
+    lhs.low ^= rhs.low
+    lhs.high ^= rhs.high
+  }
+  
+  public static func <<= (lhs: inout Self, rhs: Self) {
+    if Self.isSigned && rhs._isNegative {
+      lhs >>= 0 - rhs
+      return
+    }
+
+    // Shift is larger than this type's bit width.
+    if rhs.high != High.zero || rhs.low >= Self.bitWidth {
+      lhs = 0
+      return
+    }
+
+    lhs &<<= rhs
+  }
+  
+  public static func >>= (lhs: inout Self, rhs: Self) {
+    if Self.isSigned && rhs._isNegative {
+      lhs <<= 0 - rhs
+      return
+    }
+
+    // Shift is larger than this type's bit width.
+    if rhs.high != High.zero || rhs.low >= Self.bitWidth {
+      lhs = lhs._isNegative ? ~0 : 0
+      return
+    }
+
+    lhs &>>= rhs
+  }
+
+  public static func &<< (lhs: Self, rhs: Self) -> Self {
+    Self(_wideMaskedShiftLeft(lhs.components, rhs.low))
+  }
+  
+  public static func &>> (lhs: Self, rhs: Self) -> Self {
+    Self(_wideMaskedShiftRight(lhs.components, rhs.low))
+  }
+  
+  public static func &<<= (lhs: inout Self, rhs: Self) {
+    lhs = Self(_wideMaskedShiftLeft(lhs.components, rhs.low))
+  }
+  
+  public static func &>>= (lhs: inout Self, rhs: Self) {
+    lhs = Self(_wideMaskedShiftRight(lhs.components, rhs.low))
+  }
+  
+  public static func / (_ lhs: Self, _ rhs: Self) -> Self {
+    var lhs = lhs
+    lhs /= rhs
+    return lhs
+  }
+
+  public static func /= (_ lhs: inout Self, _ rhs: Self) {
+    let (result, overflow) = lhs.dividedReportingOverflow(by: rhs)
+    precondition(!overflow, "Overflow in /=")
+    lhs = result
+  }
+
+  public static func % (_ lhs: Self, _ rhs: Self) -> Self {
+    var lhs = lhs
+    lhs %= rhs
+    return lhs
+  }
+
+  public static func %= (_ lhs: inout Self, _ rhs: Self) {
+    let (result, overflow) = lhs.remainderReportingOverflow(dividingBy: rhs)
+    precondition(!overflow, "Overflow in %=")
+    lhs = result
+  }
+
+  public init(_truncatingBits bits: UInt) {
+    low = Low(_truncatingBits: bits)
+    high = High(_truncatingBits: bits >> UInt(Low.bitWidth))
+  }
+
+  public init(integerLiteral x: Int64) {
+    self.init(x)
+  }
+
+  public var leadingZeroBitCount: Int {
+    (high == High.zero
+      ? High.bitWidth + low.leadingZeroBitCount
+      : high.leadingZeroBitCount)
+  }
+
+  public var trailingZeroBitCount: Int {
+    (low == Low.zero
+      ? Low.bitWidth + high.trailingZeroBitCount
+      : low.trailingZeroBitCount)
+  }
+
+  public var nonzeroBitCount: Int {
+    high.nonzeroBitCount + low.nonzeroBitCount
+  }
+
+  public var byteSwapped: Self {
+    Self(
+      high: High(truncatingIfNeeded: low.byteSwapped),
+      low: Low(truncatingIfNeeded: high.byteSwapped))
+  }
+}
 
 //////////////////////////////////////////////////////////////////////////////////////////
 // MARK: - Plottable compliance
 
 @available(macOS 13.0, *)
 extension UInt128 : Plottable {
-    
-    public var primitivePlottable: Double {
-        Double(self)
-    }
-    
-    public init?(primitivePlottable x: Double) {
-        guard x.isFinite && (x - x.rounded()).isZero else { return nil }
-        self.init(x)
-    }
-    
+  
+  public var primitivePlottable: Double {
+    Double(self)
+  }
+  
+  public init?(primitivePlottable x: Double) {
+    guard x.isFinite && (x - x.rounded()).isZero else { return nil }
+    self.init(x)
+  }
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////
-// MARK: - FixedWidthInteger compliance
-
-extension UInt128 : FixedWidthInteger {
-    
-    public var nonzeroBitCount: Int {
-        value.highBits.nonzeroBitCount + value.lowBits.nonzeroBitCount
-    }
-    
-    public var byteSwapped: UInt128 {
-        UInt128(high: value.lowBits.byteSwapped, low: value.highBits.byteSwapped)
-    }
-    
-    public init(_truncatingBits bits: UInt) {
-        self.init(high: 0, low: UInt64(bits))
-    }
-      
-    public func addingReportingOverflow(_ rhs: UInt128) -> (partialValue: UInt128, overflow: Bool) {
-        let (lowBits, lowOverflow) = self.value.lowBits.addingReportingOverflow(rhs.value.lowBits)
-        var (highBits, highOverflow) = self.value.highBits.addingReportingOverflow(rhs.value.highBits)
-        var resultOverflow = false
-        if lowOverflow {
-            (highBits, resultOverflow) = highBits.addingReportingOverflow(1)
-        }
-        return (UInt128(high: highBits , low: lowBits), resultOverflow || highOverflow)
-    }
-
-    public func subtractingReportingOverflow(_ rhs: UInt128) -> (partialValue: UInt128, overflow: Bool) {
-        let (lowBits, lowOverflow) = self.value.lowBits.subtractingReportingOverflow(rhs.value.lowBits)
-        var (highBits, highOverflow) = self.value.highBits.subtractingReportingOverflow(rhs.value.highBits)
-        var resultOverflow = false
-        if lowOverflow {
-            (highBits, resultOverflow) = highBits.subtractingReportingOverflow(1)
-        }
-        return (UInt128(high: highBits , low: lowBits), resultOverflow || highOverflow)
-    }
-    
-    public func multipliedReportingOverflow(by rhs: UInt128) -> (partialValue: UInt128, overflow: Bool) {
-        let result = self.multipliedFullWidth(by: rhs)
-        return (result.low, result.high != Self.zero)
-    }
-    
-    public func multipliedFullWidth(by other: UInt128) -> (high: UInt128, low: UInt128) {
-        let lhs = self
-        let rhs = other
-        let productLL = lhs.value.lowBits.multipliedFullWidth(by: rhs.value.lowBits)
-        let productHL = lhs.value.highBits.multipliedFullWidth(by: rhs.value.lowBits)
-        
-        // Multiplies the lhs by the rhs.value.highBits and reports overflow
-        let productLH = lhs.value.lowBits.multipliedFullWidth(by: rhs.value.highBits)
-        let productHH = lhs.value.highBits.multipliedFullWidth(by: rhs.value.highBits)
-        
-        // Add the various products together
-        var resultLow = UInt128(high: 0, low:productLL.low)
-        let addMidl = UInt128(productLL.high) + UInt128(productHL.low) + UInt128(productLH.low)
-        resultLow.value.highBits = addMidl.value.lowBits
-        let addMidu = UInt128(addMidl.value.highBits) + UInt128(productHL.high) + UInt128(productLH.high) + UInt128(productHH.low)
-        let addHigh = addMidu.value.highBits + productHH.high
-        let resultHigh = UInt128(high: addHigh, low: addMidu.value.lowBits)
-        return (resultHigh, resultLow)
-    }
-
-    public func dividedReportingOverflow(by rhs: UInt128) -> (partialValue: UInt128, overflow: Bool) {
-        guard rhs != Self.zero else { return (self, true) }
-        // let result = Self.divRemAbs(self.toInteger(), w1: rhs.toInteger()).div
-        let result = Self.divideWithRemainder_KnuthD((0, self), by: rhs).quotient
-        return (UInt128(result), false)
-    }
-
-    public func remainderReportingOverflow(dividingBy rhs: UInt128) -> (partialValue: UInt128, overflow: Bool) {
-        guard rhs != Self.zero else { return (self, true) }
-        // let result = Self.divRemAbs(self.toInteger(), w1: rhs.toInteger()).rem
-        let result = Self.divideWithRemainder_KnuthD((0, self), by: rhs).remainder
-        return (UInt128(result), false)
-    }
-
-    public func dividingFullWidth(_ dividend: (high: UInt128, low: UInt128)) -> (quotient: UInt128, remainder: UInt128) {
-        //let result = Self.divRemAbs(Self.toInteger(high:dividend.high, low:dividend.low), w1: self.toInteger())
-        let result = Self.divideWithRemainder_KnuthD(dividend, by: self)
-        return (UInt128(result.quotient), UInt128(result.remainder))
-    }
-    
+extension BinaryInteger {
+  @inline(__always)
+  fileprivate var _isNegative: Bool { self < Self.zero }
 }
 
-// MARK: - TwoDigit Helper Utility Methods
-
-// -------------------------------------
-private extension FixedWidthInteger {
-    /// Fast creation of an integer from a Bool
-    init(_ source: Bool) {
-        assert(unsafeBitCast(source, to: UInt8.self) & 0xfe == 0)
-        self.init(unsafeBitCast(source, to: UInt8.self))
-    }
-}
-
-private typealias Digit = UInt
-private typealias TwoDigits = (high: Digit, low: Digit)
-
-/**
- The operators below implement the tuple operations for the 2-digit
- arithmetic needed for Knuth's Algorithm D, and *only* those operations.
- There is no attempt to be a complete set. They are meant to make the code that
- uses them more readable than if the operations they express were written out
- directly.
- */
-
-infix operator /% : MultiplicationPrecedence
-
-/// Divide a tuple of digits `left` by 1 digit `right` returning both quotient and remainder
-private func /% (left: TwoDigits, right: Digit) -> (quotient: TwoDigits, remainder: TwoDigits) {
-    var r: Digit
-    let q: TwoDigits
-    (q.high, r) = left.high.quotientAndRemainder(dividingBy: right)
-    (q.low, r) = right.dividingFullWidth((high: r, low: left.low))
-    return (q, (high: 0, low: r))
-}
-
-/// Multiply a tuple of digits `left` by 1 digit `right` returning both quotient and remainder
-private func * (left: TwoDigits, right: Digit) -> TwoDigits {
-    var product = left.low.multipliedFullWidth(by: right)
-    let productHigh = left.high.multipliedFullWidth(by: right)
-    assert(productHigh.high == 0, "multiplication overflow")
-    let c = addReportingCarry(&product.high, productHigh.low)
-    assert(c == 0, "multiplication overflow")
-    return product
-}
-
-private func > (left: TwoDigits, right: TwoDigits) -> UInt8 {
-    return UInt8(left.high > right.high) |
-            (UInt8(left.high == right.high) & UInt8(left.low > right.low))
-}
-
-/// Subtract a digit from a tuple, borrowing the high part if necessary
-private func -= (left: inout TwoDigits, right: Digit) {
-    left.high &-= subtractReportingBorrow(&left.low, right)
-}
-
-/// Add a digit to a tuple's low part, carrying to the high part.
-private func += (left: inout TwoDigits, right: Digit) {
-    left.high &+= addReportingCarry(&left.low, right)
-}
-
-// -------------------------------------
-/// Add one tuple to another tuple
-private func += (left: inout TwoDigits, right: TwoDigits) {
-    left.high &+= addReportingCarry(&left.low, right.low)
-    left.high &+= right.high
-}
-
-private func subtractReportingBorrow(_ x: inout Digit, _ y: Digit) -> Digit {
-    let b: Bool
-    (x, b) = x.subtractingReportingOverflow(y)
-    return Digit(b)
-}
-
-private func addReportingCarry(_ x: inout Digit, _ y: Digit) -> Digit {
-    let c: Bool
-    (x, c) = x.addingReportingOverflow(y)
-    return Digit(c)
-}
-
-extension UInt128 {
-    
-    /*************************************************************************************/
-    /**  Following division code was shamelessly borrowed from Chip Jarred who in turn   */
-    /**  implemented the algorithm from Donald Knuth's *Algorithm D* for dividing        */
-    /**  multiprecision unsigned integers from *The Art of Computer Programming*         */
-    /**  Volume 2: *Semi-numerical Algorithms*, Chapter 4.3.3.                           */
-    
-    /*
-        Copyright 2020 Chip Jarred
-
-        Permission is hereby granted, free of charge, to any person obtaining a copy
-        of this software and associated documentation files (the "Software"), to deal
-        in the Software without restriction, including without limitation the rights
-        to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-        copies of the Software, and to permit persons to whom the Software is
-        furnished to do so, subject to the following conditions:
-
-        The above copyright notice and this permission notice shall be included in all
-        copies or substantial portions of the Software.
-
-        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-        AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-        LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-        OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-        SOFTWARE.
-    */
-    private static func leftShift(_ x: [Digit], by shift: Int, into y: inout [Digit]) {
-        assert(y.count >= x.count)
-        assert(y.startIndex == x.startIndex)
-        let bitWidth = Digit.bitWidth
-        
-        for i in (1..<x.count).reversed() {
-            y[i] = (x[i] << shift) | (x[i - 1] >> (bitWidth - shift))
-        }
-        y[0] = x[0] << shift
-    }
-    
-    private static func rightShift(_ x: [Digit], by shift: Int, into y: inout [Digit]) {
-        assert(y.count == x.count)
-        assert(y.startIndex == x.startIndex)
-        let bitWidth = Digit.bitWidth
-        
-        let lastElemIndex = x.count - 1
-        for i in 0..<lastElemIndex {
-            y[i] = (x[i] >> shift) | (x[i + 1] << (bitWidth - shift))
-        }
-        y[lastElemIndex] = x[lastElemIndex] >> shift
-    }
-    
-    
-    private static func divide(_ x: [Digit], by y: Digit, result z: inout [Digit]) -> Digit {
-        assert(x.count == z.count)
-        assert(x.startIndex == z.startIndex)
-        
-        var r: Digit = 0
-        var i = x.count - 1
-        
-        (z[i], r) = x[i].quotientAndRemainder(dividingBy: y)
-        i -= 1
-        
-        while i >= 0 {
-            (z[i], r) = y.dividingFullWidth((r, x[i]))
-            i -= 1
-        }
-        return r
-    }
-        
-    private static func subtractReportingBorrow(_ x: [Digit], times k: Digit, from y: inout ArraySlice<Digit>) -> Bool {
-        assert(x.count + 1 <= y.count)
-        
-        func subtractReportingBorrow(_ x: inout Digit, _ y: Digit) -> Digit {
-            let b: Bool
-            (x, b) = x.subtractingReportingOverflow(y)
-            return Digit(b)
-        }
-        
-        var i = x.startIndex
-        var j = y.startIndex
-
-        var borrow: Digit = 0
-        while i < x.endIndex {
-            borrow = subtractReportingBorrow(&y[j], borrow)
-            let (pHi, pLo) = k.multipliedFullWidth(by: x[i])
-            borrow &+= pHi
-            borrow &+= subtractReportingBorrow(&y[j], pLo)
-            
-            i &+= 1
-            j &+= 1
-        }
-        return 0 != subtractReportingBorrow(&y[j], borrow)
-    }
-    
-    private static func divideWithRemainder_KnuthD(_ dividend: (high:UInt128, low:UInt128), by divisor: UInt128) ->
-    (quotient: [Digit], remainder: [Digit]) {
-        assert(divisor != 0, "Division by 0")
-        
-        let digitWidth = Digit.bitWidth
-        let dividend = dividend.low.words + dividend.high.words
-        let divisor =  divisor.words
-        let m = dividend.count
-        let n = divisor.count
-        
-        assert(n > 0, "Divisor must have at least one digit")
-        assert(m >= n, "Dividend must have at least as many digits as the divisor")
-
-        var quotient = [Digit](repeating: 0, count: m-n+1)
-        var remainder = [Digit](repeating: 0, count: n)
-        
-        guard n > 1 else {
-            remainder[0] = divide(dividend, by: divisor.first!, result: &quotient)
-            return (quotient, remainder)
-        }
-        
-        let shift = divisor.last!.leadingZeroBitCount
-        
-        var v = [Digit](repeating: 0, count: n)
-        leftShift(divisor, by: shift, into: &v)
-
-        var u = [Digit](repeating: 0, count: m + 1)
-        u[m] = dividend[m - 1] >> (digitWidth - shift)
-        leftShift(dividend, by: shift, into: &u)
-        
-        let vLast: Digit = v.last!
-        let vNextToLast: Digit = v[n - 2]
-        let partialDividendDelta: TwoDigits = (high: vLast, low: 0)
-
-        for j in (0...(m - n)).reversed() {
-            let jPlusN = j &+ n
-            
-            let dividendHead: TwoDigits = (high: u[jPlusN], low: u[jPlusN &- 1])
-            
-            // These are tuple arithemtic operations.  `/%` is custom combined
-            // division and remainder operator.  See above.
-            var (q̂, r̂) = dividendHead /% vLast
-            var partialProduct = q̂ * vNextToLast
-            var partialDividend:TwoDigits = (high: r̂.low, low: u[jPlusN &- 2])
-            
-            while true {
-                if (UInt8(q̂.high != 0) | (partialProduct > partialDividend)) == 1 {
-                    q̂ -= 1
-                    r̂ += vLast
-                    partialProduct -= vNextToLast
-                    partialDividend += partialDividendDelta
-                    
-                    if r̂.high == 0 { continue }
-                }
-                break
-            }
-
-            quotient[j] = q̂.low
-            
-            if subtractReportingBorrow(Array(v[0..<n]), times: q̂.low, from: &u[j...jPlusN]) {
-                quotient[j] &-= 1
-                u[j...jPlusN] += v[0..<n] // digit collection addition!
-            }
-        }
-        
-        rightShift(Array(u[0..<n]), by: shift, into: &remainder)
-        return (quotient, remainder)
-    }
+extension FixedWidthInteger {
+  @inline(__always)
+  fileprivate var _twosComplement: Self {
+    ~self &+ 1
+  }
 }
 
 // MARK: - BinaryFloatingPoint Interoperability
 
 extension BinaryFloatingPoint {
-    public init(_ value: UInt128) {
-        precondition(value.value.highBits == 0, "Value is too large to fit into a BinaryFloatingPoint until a 128bit BinaryFloatingPoint type is defined.")
-        self.init(value.value.lowBits)
+  public init(_ value: UInt128) {
+    precondition(value.high == 0,
+                 "Value is too large to fit into a BinaryFloatingPoint.")
+    self.init(value.low)
+  }
+  
+  public init?(exactly value: UInt128) {
+    if value.high > 0 {
+      return nil
     }
-
-    public init?(exactly value: UInt128) {
-        if value.value.highBits > 0 {
-            return nil
-        }
-        self = Self(value.value.lowBits)
-    }
+    self = Self(value.low)
+  }
 }
+
+private typealias _Wide2<F: FixedWidthInteger> =
+  (high: F, low: F.Magnitude)
+
+private typealias _Wide3<F: FixedWidthInteger> =
+  (high: F, mid: F.Magnitude, low: F.Magnitude)
+
+private typealias _Wide4<F: FixedWidthInteger> =
+  (high: _Wide2<F>, low: (high: F.Magnitude, low: F.Magnitude))
+
+private func _wideMagnitude22<F: FixedWidthInteger>(_ v: _Wide2<F>) ->
+    _Wide2<F.Magnitude> {
+  var result = (high: F.Magnitude(truncatingIfNeeded: v.high), low: v.low)
+  guard F.isSigned && v.high._isNegative else { return result }
+  result.high = ~result.high
+  result.low = ~result.low
+  return _wideAddReportingOverflow22(result, (high: 0, low: 1)).partialValue
+}
+
+private func _wideAddReportingOverflow22<F: FixedWidthInteger>(
+  _ lhs: _Wide2<F>, _ rhs: _Wide2<F>
+) -> (partialValue: _Wide2<F>, overflow: Bool) {
+  let (low, lowOverflow) = lhs.low.addingReportingOverflow(rhs.low)
+  let (high, highOverflow) = lhs.high.addingReportingOverflow(rhs.high)
+  let overflow = highOverflow || high == F.max && lowOverflow
+  let result = (high: high &+ (lowOverflow ? 1 : 0), low: low)
+  return (partialValue: result, overflow: overflow)
+}
+
+private func _wideAdd22<F: FixedWidthInteger>(
+  _ lhs: inout _Wide2<F>, _ rhs: _Wide2<F>
+) {
+  let (result, overflow) = _wideAddReportingOverflow22(lhs, rhs)
+  precondition(!overflow, "Overflow in +")
+  lhs = result
+}
+
+private func _wideAddReportingOverflow33<F: FixedWidthInteger>(
+  _ lhs: _Wide3<F>, _ rhs: _Wide3<F>
+) -> (
+  partialValue: _Wide3<F>,
+  overflow: Bool
+) {
+  let (low, lowOverflow) =
+    _wideAddReportingOverflow22((lhs.mid, lhs.low), (rhs.mid, rhs.low))
+  let (high, highOverflow) = lhs.high.addingReportingOverflow(rhs.high)
+  let result = (high: high &+ (lowOverflow ? 1 : 0), mid: low.high, low: low.low)
+  let overflow = highOverflow || (high == F.max && lowOverflow)
+  return (partialValue: result, overflow: overflow)
+}
+
+private func _wideSubtractReportingOverflow22<F: FixedWidthInteger>(
+  _ lhs: _Wide2<F>, _ rhs: _Wide2<F>
+) -> (partialValue: (high: F, low: F.Magnitude), overflow: Bool) {
+  let (low, lowOverflow) = lhs.low.subtractingReportingOverflow(rhs.low)
+  let (high, highOverflow) = lhs.high.subtractingReportingOverflow(rhs.high)
+  let result = (high: high &- (lowOverflow ? 1 : 0), low: low)
+  let overflow = highOverflow || high == F.min && lowOverflow
+  return (partialValue: result, overflow: overflow)
+}
+
+private func _wideSubtract22<F: FixedWidthInteger>(
+  _ lhs: inout _Wide2<F>, _ rhs: _Wide2<F>
+) {
+  let (result, overflow) = _wideSubtractReportingOverflow22(lhs, rhs)
+  precondition(!overflow, "Overflow in -")
+  lhs = result
+}
+
+private func _wideSubtractReportingOverflow33<F: FixedWidthInteger>(
+  _ lhs: _Wide3<F>, _ rhs: _Wide3<F>
+) -> (
+  partialValue: _Wide3<F>,
+  overflow: Bool
+) {
+  let (low, lowOverflow) =
+    _wideSubtractReportingOverflow22((lhs.mid, lhs.low), (rhs.mid, rhs.low))
+  let (high, highOverflow) = lhs.high.subtractingReportingOverflow(rhs.high)
+  let result = (high: high &- (lowOverflow ? 1 : 0), mid: low.high, low: low.low)
+  let overflow = highOverflow || (high == F.min && lowOverflow)
+  return (partialValue: result, overflow: overflow)
+}
+
+private func _wideMaskedShiftLeft<F: FixedWidthInteger>(
+  _ lhs: _Wide2<F>, _ rhs: F.Magnitude) -> _Wide2<F> {
+  let bitWidth = F.bitWidth + F.Magnitude.bitWidth
+  precondition(bitWidth.nonzeroBitCount == 1)
+
+  // Mask rhs by the bit width of the wide value.
+  let rhs = rhs & F.Magnitude(bitWidth &- 1)
+
+  guard rhs < F.Magnitude.bitWidth else {
+    let s = rhs &- F.Magnitude(F.Magnitude.bitWidth)
+    return (high: F(truncatingIfNeeded: lhs.low &<< s), low: 0)
+  }
+
+  guard rhs != F.Magnitude.zero else { return lhs }
+  var high = lhs.high &<< F(rhs)
+  let rollover = F.Magnitude(F.bitWidth) &- rhs
+  high |= F(truncatingIfNeeded: lhs.low &>> rollover)
+  let low = lhs.low &<< rhs
+  return (high, low)
+}
+
+private func _wideMaskedShiftLeft<F: FixedWidthInteger>(
+  _ lhs: inout _Wide2<F>, _ rhs: F.Magnitude
+) {
+  lhs = _wideMaskedShiftLeft(lhs, rhs)
+}
+
+private func _wideMaskedShiftRight<F: FixedWidthInteger>(
+  _ lhs: _Wide2<F>, _ rhs: F.Magnitude
+) -> _Wide2<F> {
+  let bitWidth = F.bitWidth + F.Magnitude.bitWidth
+  precondition(bitWidth.nonzeroBitCount == 1)
+
+  // Mask rhs by the bit width of the wide value.
+  let rhs = rhs & F.Magnitude(bitWidth &- 1)
+
+  guard rhs < F.bitWidth else {
+    let s = F(rhs &- F.Magnitude(F.bitWidth))
+    return (
+      high: lhs.high._isNegative ? ~0 : 0,
+      low: F.Magnitude(truncatingIfNeeded: lhs.high &>> s))
+  }
+
+  guard rhs != F.zero else { return lhs }
+  var low = lhs.low &>> rhs
+  let rollover = F(F.bitWidth) &- F(rhs)
+  low |= F.Magnitude(truncatingIfNeeded: lhs.high &<< rollover)
+  let high = lhs.high &>> rhs
+  return (high, low)
+}
+
+private func _wideMaskedShiftRight<F: FixedWidthInteger>(
+  _ lhs: inout _Wide2<F>, _ rhs: F.Magnitude) {
+  lhs = _wideMaskedShiftRight(lhs, rhs)
+}
+
+/// Returns the quotient and remainder after dividing a triple-width magnitude
+/// `lhs` by a double-width magnitude `rhs`.
+///
+/// This operation is conceptually as described by Burnikel and Ziegler(1998).
+private func _wideDivide32<F: FixedWidthInteger & UnsignedInteger>(
+  _ lhs: _Wide3<F>, by rhs: _Wide2<F>) ->
+  (quotient: F, remainder: _Wide2<F>) {
+  // The following invariants are guaranteed to hold by dividingFullWidth or
+  // quotientAndRemainder before this function is invoked:
+  precondition(lhs.high != F.zero)
+  precondition(rhs.high.leadingZeroBitCount == 0)
+  precondition((high: lhs.high, low: lhs.mid) < rhs)
+
+  // Estimate the quotient with a 2/1 division using just the top digits.
+  var quotient = (lhs.high == rhs.high
+    ? F.max
+    : rhs.high.dividingFullWidth((high: lhs.high, low: lhs.mid)).quotient)
+
+  // Compute quotient * rhs.
+  // TODO: This could be performed more efficiently.
+  let p1 = quotient.multipliedFullWidth(by: F(rhs.low))
+  let p2 = quotient.multipliedFullWidth(by: rhs.high)
+  let product = _wideAddReportingOverflow33(
+    (high: F.zero, mid: F.Magnitude(p1.high), low: p1.low),
+    (high: p2.high, mid: p2.low, low: .zero)).partialValue
+
+  // Compute the remainder after decrementing quotient as necessary.
+  var remainder = lhs
+
+  while remainder < product {
+    quotient = quotient &- 1
+    remainder = _wideAddReportingOverflow33(
+      remainder,
+      (high: F.zero, mid: F.Magnitude(rhs.high), low: rhs.low)).partialValue
+  }
+  remainder = _wideSubtractReportingOverflow33(remainder, product).partialValue
+  precondition(remainder.high == 0)
+  return (quotient, (high: F(remainder.mid), low: remainder.low))
+}
+
+/// Returns the quotient and remainder after dividing a double-width
+/// magnitude `lhs` by a double-width magnitude `rhs`.
+private func _wideDivide22<F: FixedWidthInteger & UnsignedInteger>(
+  _ lhs: _Wide2<F>, by rhs: _Wide2<F>) ->
+  (quotient: _Wide2<F>, remainder: _Wide2<F>) {
+  guard _fastPath(rhs > (F.zero, F.Magnitude.zero)) else {
+    fatalError("Division by zero")
+  }
+  guard rhs < lhs else {
+    if _fastPath(rhs > lhs) { return (quotient: (0, 0), remainder: lhs) }
+    return (quotient: (0, 1), remainder: (0, 0))
+  }
+
+  if lhs.high == F.zero {
+    let (quotient, remainder) =
+      lhs.low.quotientAndRemainder(dividingBy: rhs.low)
+    return ((0, quotient), (0, remainder))
+  }
+
+  if rhs.high == F.zero {
+    let (x, a) = lhs.high.quotientAndRemainder(dividingBy: F(rhs.low))
+    let (y, b) = (a == F.zero
+      ? lhs.low.quotientAndRemainder(dividingBy: rhs.low)
+      : rhs.low.dividingFullWidth((F.Magnitude(a), lhs.low)))
+    return (quotient: (high: x, low: y), remainder: (high: 0, low: b))
+  }
+
+  // Left shift both rhs and lhs, then divide and right shift the remainder.
+  let shift = F.Magnitude(rhs.high.leadingZeroBitCount)
+  let rollover = F.Magnitude(F.bitWidth + F.Magnitude.bitWidth) &- shift
+  let rhs = _wideMaskedShiftLeft(rhs, shift)
+  let high = _wideMaskedShiftRight(lhs, rollover).low
+  let lhs = _wideMaskedShiftLeft(lhs, shift)
+  let (quotient, remainder) = _wideDivide32(
+    (F(high), F.Magnitude(lhs.high), lhs.low), by: rhs)
+  return (
+    quotient: (high: 0, low: F.Magnitude(quotient)),
+    remainder: _wideMaskedShiftRight(remainder, shift))
+}
+
+/// Returns the quotient and remainder after dividing a quadruple-width
+/// magnitude `lhs` by a double-width magnitude `rhs`.
+private func _wideDivide42<F: FixedWidthInteger & UnsignedInteger>(
+  _ lhs: _Wide4<F>, by rhs: _Wide2<F>) ->
+  (quotient: _Wide2<F>, remainder: _Wide2<F>) {
+  guard _fastPath(rhs > (F.zero, F.Magnitude.zero)) else {
+    fatalError("Division by zero")
+  }
+  guard _fastPath(rhs >= lhs.high) else {
+    fatalError("Division results in an overflow")
+  }
+
+  if lhs.high == (F.zero, F.Magnitude.zero) {
+    return _wideDivide22((high: F(lhs.low.high), low: lhs.low.low), by: rhs)
+  }
+
+  if rhs.high == F.zero {
+    let a = F.Magnitude(lhs.high.high) % rhs.low
+    let b = (a == F.Magnitude.zero
+      ? lhs.high.low % rhs.low
+      : rhs.low.dividingFullWidth((a, lhs.high.low)).remainder)
+    let (x, c) = (b == F.Magnitude.zero
+      ? lhs.low.high.quotientAndRemainder(dividingBy: rhs.low)
+      : rhs.low.dividingFullWidth((b, lhs.low.high)))
+    let (y, d) = (c == F.Magnitude.zero
+      ? lhs.low.low.quotientAndRemainder(dividingBy: rhs.low)
+      : rhs.low.dividingFullWidth((c, lhs.low.low)))
+    return (quotient: (high: F(x), low: y), remainder: (high: 0, low: d))
+  }
+
+  // Left shift both rhs and lhs, then divide and right shift the remainder.
+  let shift = F.Magnitude(rhs.high.leadingZeroBitCount)
+  let rollover = F.Magnitude(F.bitWidth + F.Magnitude.bitWidth) &- shift
+  let rhs = _wideMaskedShiftLeft(rhs, shift)
+
+  let lh1 = _wideMaskedShiftLeft(lhs.high, shift)
+  let lh2 = _wideMaskedShiftRight(lhs.low, rollover)
+  let lhs = (
+    high: (high: lh1.high | F(lh2.high), low: lh1.low | lh2.low),
+    low: _wideMaskedShiftLeft(lhs.low, shift))
+
+  if
+    lhs.high.high == F.Magnitude.zero,
+    (high: F(lhs.high.low), low: lhs.low.high) < rhs
+  {
+    let (quotient, remainder) = _wideDivide32(
+      (F(lhs.high.low), lhs.low.high, lhs.low.low),
+      by: rhs)
+    return (
+      quotient: (high: 0, low: F.Magnitude(quotient)),
+      remainder: _wideMaskedShiftRight(remainder, shift))
+  }
+  let (x, a) = _wideDivide32(
+    (lhs.high.high, lhs.high.low, lhs.low.high), by: rhs)
+  let (y, b) = _wideDivide32((a.high, a.low, lhs.low.low), by: rhs)
+  return (
+    quotient: (high: x, low: F.Magnitude(y)),
+    remainder: _wideMaskedShiftRight(b, shift))
+}
+
+extension UInt128: UnsignedInteger {}
+
+

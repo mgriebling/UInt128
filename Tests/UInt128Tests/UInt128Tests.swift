@@ -103,16 +103,16 @@ class BaseTypeTests : XCTestCase {
             let result = UInt128(high: test.input.high,
                                  low: test.input.low)
 
-            XCTAssertEqual(result.value.highBits, test.output.high)
-            XCTAssertEqual(result.value.lowBits, test.output.low)
+            XCTAssertEqual(result.high, test.output.high)
+            XCTAssertEqual(result.low, test.output.low)
         }
     }
 
     func testDefaultInitializerSetsUpperAndLowerBitsToZero() {
         let result = UInt128()
 
-        XCTAssertEqual(result.value.highBits, 0)
-        XCTAssertEqual(result.value.lowBits, 0)
+        XCTAssertEqual(result.high, 0)
+        XCTAssertEqual(result.low, 0)
     }
 
     func testInitWithUInt128() {
@@ -864,7 +864,7 @@ class EquatableTests : XCTestCase {
 
 class ExpressibleByIntegerLiteralTests : XCTestCase {
     func testInitWithIntegerLiteral() {
-        var tests: [(input: Int, result: UInt128)]
+        var tests: [(input: Int64, result: UInt128)]
         tests = [(input: 0, result: UInt128())]
         tests.append((input: 1, result: UInt128(high: 0, low: 1)))
         tests.append((input: 9223372036854775807, result: UInt128(high: 0, low: UInt64(Int.max))))
@@ -985,35 +985,35 @@ class ComparableTests : XCTestCase {
 }
 
 class FailableStringInitializerTests : XCTestCase {
-    func stringTests() -> [(input: String, result: UInt128?)] {
-        var tests = [(input: "", result: nil as UInt128?)]
-        tests.append((input: "0", result: UInt128()))
-        tests.append((input: "1", result: UInt128(1)))
-        tests.append((input: "99", result: UInt128(99)))
-        tests.append((input: "0b0101", result: UInt128(5)))
-        tests.append((input: "0o11", result: UInt128(9)))
-        tests.append((input: "0xFF", result: UInt128(255)))
-        tests.append((input: "0z1234", result: nil))
+    func stringTests() -> [(input: String, radix: Int, result: UInt128?)] {
+        var tests = [(input: "", 10, result: nil as UInt128?)]
+        tests.append((input: "0", 10, result: UInt128()))
+        tests.append((input: "1", 10, result: UInt128(1)))
+        tests.append((input: "99", 10, result: UInt128(99)))
+        tests.append((input: "0101", 2, result: UInt128(5)))
+        tests.append((input: "11", 8, result: UInt128(9)))
+        tests.append((input: "FF", 16, result: UInt128(255)))
+        tests.append((input: "0z1234", 10, result: nil))
         return tests
     }
 
     func testInitWithStringLiteral() {
         stringTests().forEach { test in
-            XCTAssertEqual(UInt128(test.input), test.result)
+            XCTAssertEqual(UInt128(test.input, radix: test.radix), test.result)
         }
     }
 
     func testEvaluatedWithStringLiteral() {
-        let binaryTest = UInt128("0b11")
+        let binaryTest = UInt128("11", radix: 2)
         XCTAssertEqual(binaryTest, UInt128(3))
 
-        let octalTest = UInt128("0o11")
+        let octalTest = UInt128("11", radix: 8)
         XCTAssertEqual(octalTest, UInt128(9))
 
-        let decimalTest = UInt128("11")
+        let decimalTest = UInt128("11", radix: 10)
         XCTAssertEqual(decimalTest, UInt128(11))
 
-        let hexTest = UInt128("0x11")
+        let hexTest = UInt128("11", radix: 16)
         XCTAssertEqual(hexTest, UInt128(17))
     }
 }
@@ -1073,7 +1073,7 @@ final class BasicUInt128Tests: XCTestCase {
     
     func testBasicMath() throws {
         // Basic go/nogo test to verify the basic operations
-        let x = UInt128("123_456_789_012_345_678_901_234_567_890")
+        let x = UInt128("123456789012345678901234567890")
         let y = UInt128(100_000_000)
         let z = x + y
         let v = x - y
@@ -1084,7 +1084,7 @@ final class BasicUInt128Tests: XCTestCase {
         let e = x | y
         let f = x ^ y
         let g = ~x
-        let h = UInt128("0x1234_5678_90AB_CDEF_1234_5678_90AB_CDEF")
+        let h = UInt128("1234567890ABCDEF1234567890ABCDEF", radix: 16)!
         print("x = \(x); y = \(y)")
         print("x + y = \(z)")
         print("x - y = \(v)")
@@ -1118,10 +1118,10 @@ final class BasicUInt128Tests: XCTestCase {
     
     func testPerformanceUInt128Multiply() {
         // Multiply is 13X faster than UInt128 from Gerber
-        let x = UInt128("123_456_789_012_345_678_901_234_567_890")
+        let x = UInt128("123456789012345678901234567890")
         let y = UInt128(100_000_000)
         self.measure {
-            for _ in 1...100 {
+            for _ in 1...1000 {
                 let _ = x * y
             }
         }
@@ -1129,10 +1129,10 @@ final class BasicUInt128Tests: XCTestCase {
     
     func testPerformanceUInt128Divide() {
         // Divide is 40X faster than UInt128 from Gerber
-        let x =  UInt128("123_456_789_012_345_678_901_234_567_890")
+        let x = UInt128("123456789012345678901234567890")
         let y = UInt128(100_000_000)
         self.measure {
-            for _ in 1...100 {
+            for _ in 1...1000 {
                 let _ = x / y
             }
         }
@@ -1141,8 +1141,8 @@ final class BasicUInt128Tests: XCTestCase {
     func testPerformanceUInt128FromString() {
         // UInt128 from String is 39X faster than UInt128 from Gerber
         self.measure {
-            for _ in 1...100 {
-                let _ = UInt128("123_456_789_012_345_678_901_234_567_890")
+            for _ in 1...1000 {
+                let _ = UInt128("123456789012345678901234567890")
             }
         }
     }
@@ -1150,7 +1150,7 @@ final class BasicUInt128Tests: XCTestCase {
     func testPerformanceUInt128ToString() {
         // UInt128 to String is 380X faster than UInt128 from Gerber
         self.measure {
-            for _ in 1...100 {
+            for _ in 1...1000 {
                 let _ = UInt128.max.description
             }
         }
