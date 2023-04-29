@@ -1,4 +1,3 @@
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1)
 //===----------------------------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -11,10 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 17)
-/// A 128-bit unsigned integer type.
-public struct UInt128 : Codable {
-  public typealias High = UInt64
+% for signed in [False, True]:
+%   U = '' if signed else 'U'
+%   Self = 'Int128' if signed else 'UInt128'
+%   Other = 'UInt128' if signed else 'Int128'
+/// A 128-bit ${'signed' if signed else 'unsigned'} integer type.
+public struct ${U}Int128 : Codable {
+  public typealias High = ${U}Int64
   public typealias Low = UInt64
 
   /// The low part of the value.
@@ -41,7 +43,7 @@ public struct UInt128 : Codable {
     self.init(high: 0, low: 0)
   }
 
-  public init(bitPattern v: Int128) {
+  public init(bitPattern v: ${Other}) {
     self.init(high: High(bitPattern: v.high), low: v.low)
   }
 
@@ -49,7 +51,7 @@ public struct UInt128 : Codable {
   public static var one: Self { Self(high: 0, low: 1) }
 }
 
-extension UInt128 {
+extension ${U}Int128 {
   /// Divides `x` by rⁿ where r is the `radix`. Returns the quotient,
   /// remainder, and digits
   private static func div (x: UInt128, radix: Int) ->
@@ -99,19 +101,19 @@ extension UInt128 {
   }
 }
 
-extension UInt128 : CustomStringConvertible {
+extension ${U}Int128 : CustomStringConvertible {
   public var description: String {
     string(withRadix: 10)
   }
 }
 
-extension UInt128: CustomDebugStringConvertible {
+extension ${U}Int128: CustomDebugStringConvertible {
   public var debugDescription: String {
     description
   }
 }
 
-extension UInt128 {
+extension ${U}Int128 {
   public init?<S: StringProtocol>(_ text: S, radix: Int = 10) {
     guard !text.isEmpty else { return nil }
     guard 2...36 ~= radix else { return nil }
@@ -128,7 +130,7 @@ extension UInt128 {
   }
 }
 
-extension UInt128 {
+extension ${U}Int128 {
   /// This method breaks `string` into pieces to reduce overhead of the
   /// multiplications and allow UInt64 to work in converting larger numbers.
   fileprivate static func value<S: StringProtocol>(
@@ -136,9 +138,12 @@ extension UInt128 {
     // Handles signs and leading zeros
     let uradix = UInt64(radix)
     var s = String(string)
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 145)
+    % if signed:
+    var isNegative = false
+    if s.hasPrefix("-") { isNegative = true }
+    % else:
     if s.hasPrefix("-") { return nil }
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 147)
+    % end
     if s.hasPrefix("+") { s.removeFirst() }
     while s.hasPrefix("0") { s.removeFirst() }
     
@@ -158,7 +163,11 @@ extension UInt128 {
         return nil
       }
     }
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 171)
+    % if signed:
+    if isNegative {
+      return -r
+    }
+    % end
     return r
   }
   
@@ -183,33 +192,33 @@ extension UInt128 {
   }
 }
 
-extension UInt128: Equatable {
+extension ${U}Int128: Equatable {
   public static func == (_ lhs: Self, _ rhs: Self) -> Bool {
     return (lhs.high, lhs.low) == (rhs.high, rhs.low)
   }
 }
 
-extension UInt128: Comparable {
+extension ${U}Int128: Comparable {
   public static func < (_ lhs: Self, _ rhs: Self) -> Bool {
     (lhs.high, lhs.low) < (rhs.high, rhs.low)
   }
 }
 
-extension UInt128: Hashable {
+extension ${U}Int128: Hashable {
   public func hash(into hasher: inout Hasher) {
     hasher.combine(low)
     hasher.combine(high)
   }
 }
 
-extension UInt128 {
+extension ${U}Int128 {
   public var components: (high: High, low: Low) {
     @inline(__always) get { (high, low) }
     @inline(__always) set { (self.high, self.low) = (newValue.high, newValue.low) }
   }
 }
 
-extension UInt128: AdditiveArithmetic {
+extension ${U}Int128: AdditiveArithmetic {
   public static func - (_ lhs: Self, _ rhs: Self) -> Self {
     let (result, overflow) = lhs.subtractingReportingOverflow(rhs)
     precondition(!overflow, "Overflow in -")
@@ -235,13 +244,19 @@ extension UInt128: AdditiveArithmetic {
   }
 }
 
-extension UInt128: Numeric {
+extension ${U}Int128: Numeric {
   public typealias Magnitude = UInt128
 
   public var magnitude: Magnitude {
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 258)
+    % if signed:
+    var result = UInt128(bitPattern: self)
+    guard high._isNegative else { return result }
+    result.high = ~result.high
+    result.low = ~result.low
+    return result.addingReportingOverflow(.one).partialValue
+    % else:
     return self
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 260)
+    % end
   }
 
   public init(_ magnitude: Magnitude) {
@@ -291,17 +306,17 @@ extension UInt128: Numeric {
   }
 }
 
-extension UInt128 {
+extension ${U}Int128 {
   public struct Words {
-    internal var _value: UInt128
+    internal var _value: ${U}Int128
 
-    internal init(_ value: UInt128) {
+    internal init(_ value: ${U}Int128) {
       self._value = value
     }
   }
 }
 
-extension UInt128.Words: RandomAccessCollection {
+extension ${U}Int128.Words: RandomAccessCollection {
   public typealias Element = UInt
   public typealias Index = Int
   public typealias Indices = Range<Int>
@@ -319,7 +334,7 @@ extension UInt128.Words: RandomAccessCollection {
       precondition(position >= 0 && position < endIndex,
         "Word index out of range")
       let shift = position &* UInt.bitWidth
-      precondition(shift < UInt128.bitWidth)
+      precondition(shift < ${U}Int128.bitWidth)
 
       let r = _wideMaskedShiftRight(
         _value.components, UInt64(truncatingIfNeeded: shift))
@@ -328,7 +343,7 @@ extension UInt128.Words: RandomAccessCollection {
   }
 }
 
-extension UInt128: FixedWidthInteger {
+extension ${U}Int128: FixedWidthInteger {
   public var _lowWord: UInt {
     low._lowWord
   }
@@ -338,7 +353,7 @@ extension UInt128: FixedWidthInteger {
   }
 
   public static var isSigned: Bool {
-    false
+    ${'true' if signed else 'false'}
   }
 
   public static var max: Self {
@@ -369,7 +384,13 @@ extension UInt128: FixedWidthInteger {
   public func multipliedReportingOverflow(
     by rhs: Self
   ) -> (partialValue: Self, overflow: Bool) {
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 394)
+    % if signed:
+    let isNegative = (self._isNegative != rhs._isNegative)
+    let (p, overflow) = self.magnitude.multipliedReportingOverflow(
+      by: rhs.magnitude)
+    let r = Int128(bitPattern: isNegative ? p._twosComplement : p)
+    return (r, overflow || (isNegative != r._isNegative))
+    % else:
     let h1 = self.high.multipliedReportingOverflow(by: rhs.low)
     let h2 = self.low.multipliedReportingOverflow(by: rhs.high)
     let h3 = h1.partialValue.addingReportingOverflow(h2.partialValue)
@@ -379,7 +400,7 @@ extension UInt128: FixedWidthInteger {
       (self.high != 0 && rhs.high != 0)
       || h1.overflow || h2.overflow || h3.overflow || high.overflow)
     return (Self(high: high.partialValue, low: l), overflow)
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 404)
+    % end
   }
 
   /// Returns the product of this value and the given 64-bit value, along with a
@@ -387,13 +408,18 @@ extension UInt128: FixedWidthInteger {
   public func multipliedReportingOverflow(
     by other: UInt64
   ) -> (partialValue: Self, overflow: Bool) {
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 417)
+    % if signed:
+    let isNegative = self._isNegative
+    let (p, overflow) = self.magnitude.multipliedReportingOverflow(by: other)
+    let r = Int128(bitPattern: isNegative ? p._twosComplement : p)
+    return (r, overflow || (isNegative != r._isNegative))
+    % else:
     let h1 = self.high.multipliedReportingOverflow(by: other)
     let (h2, l) = self.low.multipliedFullWidth(by: other)
     let high = h1.partialValue.addingReportingOverflow(h2)
     let overflow = h1.overflow || high.overflow
     return (Self(high: high.partialValue, low: l), overflow)
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 423)
+    % end
   }
 
   public func multiplied(by other: UInt64) -> Self {
@@ -409,645 +435,7 @@ extension UInt128: FixedWidthInteger {
       self.magnitude.components, by: other.magnitude.components)
     let quotient = Self.Magnitude(q)
     let remainder = Self.Magnitude(r)
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 448)
-    return (quotient, remainder)
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 450)
-  }
-
-  public func dividedReportingOverflow(
-    by other: Self
-  ) -> (partialValue: Self, overflow: Bool) {
-    if other == Self.zero {
-      return (self, true)
-    }
-    if Self.isSigned && other == -1 && self == .min {
-      return (self, true)
-    }
-    return (quotientAndRemainder(dividingBy: other).quotient, false)
-  }
-
-  public func remainderReportingOverflow(
-    dividingBy other: Self
-  ) -> (partialValue: Self, overflow: Bool) {
-    if other == Self.zero {
-      return (self, true)
-    }
-    if Self.isSigned && other == -1 && self == .min {
-      return (0, true)
-    }
-    return (quotientAndRemainder(dividingBy: other).remainder, false)
-  }
-
-  public func multipliedFullWidth(
-    by other: Self
-  ) -> (high: Self, low: Magnitude) {
-    let isNegative = Self.isSigned && (self._isNegative != other._isNegative)
-
-    func sum(_ x: Low, _ y: Low) -> (high: Low, low: Low) {
-      let (sum, overflow) = x.addingReportingOverflow(y)
-      return (overflow ? 1 : 0, sum)
-    }
-
-    func sum(_ x: Low, _ y: Low, _ z: Low) -> (high: Low, low: Low) {
-      let s1 = sum(x, y)
-      let s2 = sum(s1.low, z)
-      return (s1.high &+ s2.high, s2.low)
-    }
-
-    func sum(
-      _ x0: Low, _ x1: Low, _ x2: Low, _ x3: Low
-    ) -> (high: Low, low: Low) {
-      let s1 = sum(x0, x1)
-      let s2 = sum(x2, x3)
-      let s = sum(s1.low, s2.low)
-      return (s1.high &+ s2.high &+ s.high, s.low)
-    }
-
-    let lhs = self.magnitude
-    let rhs = other.magnitude
-
-    let a = rhs.low.multipliedFullWidth(by: lhs.low)
-    let b = rhs.low.multipliedFullWidth(by: lhs.high)
-    let c = rhs.high.multipliedFullWidth(by: lhs.low)
-    let d = rhs.high.multipliedFullWidth(by: lhs.high)
-
-    let mid1 = sum(a.high, b.low, c.low)
-    let mid2 = sum(b.high, c.high, mid1.high, d.low)
-
-    let high = UInt128(
-      high: High(d.high &+ mid2.high), // Note: this addition will never wrap
-      low: mid2.low)
-    let low = UInt128(
-      high: mid1.low,
-      low: a.low)
-
-    if isNegative {
-      let (lowComplement, overflow) = (~low).addingReportingOverflow(.one)
-      return (~high + (overflow ? 1 : 0), lowComplement)
-    } else {
-      return (high, low)
-    }
-  }
-
-  public func dividingFullWidth(
-    _ dividend: (high: Self, low: Self.Magnitude)
-  ) -> (quotient: Self, remainder: Self) {
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 543)
-    let (q, r) = _wideDivide42(
-      (dividend.high.components, dividend.low.components),
-      by: self.components)
-    return (Self(q), Self(r))
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 548)
-  }
-
-  #if false // This triggers an unexpected type checking issue with `~0` in an
-            // lldb test
-  public static prefix func ~(x: Self) -> Self {
-    Self(high: ~x.high, low: ~x.low)
-  }
-  #endif
-
-  public static func &= (_ lhs: inout Self, _ rhs: Self) {
-    lhs.low &= rhs.low
-    lhs.high &= rhs.high
-  }
-
-  public static func |= (_ lhs: inout Self, _ rhs: Self) {
-    lhs.low |= rhs.low
-    lhs.high |= rhs.high
-  }
-
-  public static func ^= (_ lhs: inout Self, _ rhs: Self) {
-    lhs.low ^= rhs.low
-    lhs.high ^= rhs.high
-  }
-
-  public static func <<= (_ lhs: inout Self, _ rhs: Self) {
-    if Self.isSigned && rhs._isNegative {
-      lhs >>= 0 - rhs
-      return
-    }
-
-    // Shift is larger than this type's bit width.
-    if rhs.high != High.zero || rhs.low >= Self.bitWidth {
-      lhs = 0
-      return
-    }
-
-    lhs &<<= rhs
-  }
-
-  public static func >>= (_ lhs: inout Self, _ rhs: Self) {
-    if Self.isSigned && rhs._isNegative {
-      lhs <<= 0 - rhs
-      return
-    }
-
-    // Shift is larger than this type's bit width.
-    if rhs.high != High.zero || rhs.low >= Self.bitWidth {
-      lhs = lhs._isNegative ? ~0 : 0
-      return
-    }
-
-    lhs &>>= rhs
-  }
-
-  public static func &<< (lhs: Self, rhs: Self) -> Self {
-    Self(_wideMaskedShiftLeft(lhs.components, rhs.low))
-  }
-
-  public static func &>> (lhs: Self, rhs: Self) -> Self {
-    Self(_wideMaskedShiftRight(lhs.components, rhs.low))
-  }
-
-  public static func &<<= (lhs: inout Self, rhs: Self) {
-    _wideMaskedShiftLeft(&lhs.components, rhs.low)
-  }
-
-  public static func &>>= (lhs: inout Self, rhs: Self) {
-    _wideMaskedShiftRight(&lhs.components, rhs.low)
-  }
-
-  public static func / (
-    _ lhs: Self, _ rhs: Self
-  ) -> Self {
-    var lhs = lhs
-    lhs /= rhs
-    return lhs
-  }
-
-  public static func /= (_ lhs: inout Self, _ rhs: Self) {
-    let (result, overflow) = lhs.dividedReportingOverflow(by: rhs)
-    precondition(!overflow, "Overflow in /=")
-    lhs = result
-  }
-
-  public static func % (
-    _ lhs: Self, _ rhs: Self
-  ) -> Self {
-    var lhs = lhs
-    lhs %= rhs
-    return lhs
-  }
-
-  public static func %= (_ lhs: inout Self, _ rhs: Self) {
-    let (result, overflow) = lhs.remainderReportingOverflow(dividingBy: rhs)
-    precondition(!overflow, "Overflow in %=")
-    lhs = result
-  }
-
-  public init(_truncatingBits bits: UInt) {
-    low = Low(_truncatingBits: bits)
-    high = High(_truncatingBits: bits >> UInt(Low.bitWidth))
-  }
-
-  public init(integerLiteral x: Int64) {
-    self.init(x)
-  }
-
-  public var leadingZeroBitCount: Int {
-    (high == High.zero
-      ? High.bitWidth + low.leadingZeroBitCount
-      : high.leadingZeroBitCount)
-  }
-
-  public var trailingZeroBitCount: Int {
-    (low == Low.zero
-      ? Low.bitWidth + high.trailingZeroBitCount
-      : low.trailingZeroBitCount)
-  }
-
-  public var nonzeroBitCount: Int {
-    high.nonzeroBitCount + low.nonzeroBitCount
-  }
-
-  public var byteSwapped: Self {
-    Self(
-      high: High(truncatingIfNeeded: low.byteSwapped),
-      low: Low(truncatingIfNeeded: high.byteSwapped))
-  }
-}
-
-extension UInt128: Sendable {}
-
-// MARK: - BinaryFloatingPoint Interoperability
-extension BinaryFloatingPoint {
-    public init(_ value: UInt128) {
-        precondition(value.high == 0,
-                     "Value is too large to fit into a BinaryFloatingPoint.")
-        self.init(value.low)
-    }
-
-    public init?(exactly value: UInt128) {
-        if value.high > 0 {
-            return nil
-        }
-        self = Self(value.low)
-    }
-}
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 17)
-/// A 128-bit signed integer type.
-public struct Int128 : Codable {
-  public typealias High = Int64
-  public typealias Low = UInt64
-
-  /// The low part of the value.
-  internal var low: Low
-
-  /// The high part of the value.
-  internal var high: High
-
-  /// Creates a new instance from the given tuple of high and low parts.
-  ///
-  /// - Parameter value: The tuple to use as the source of the new instance's
-  ///   high and low parts.
-  public init(_ value: (high: High, low: Low)) {
-    self.low = value.low
-    self.high = value.high
-  }
-
-  public init(high: High, low: Low) {
-    self.low = low
-    self.high = high
-  }
-
-  public init() {
-    self.init(high: 0, low: 0)
-  }
-
-  public init(bitPattern v: UInt128) {
-    self.init(high: High(bitPattern: v.high), low: v.low)
-  }
-
-  public static var zero: Self { Self(high: 0, low: 0) }
-  public static var one: Self { Self(high: 0, low: 1) }
-}
-
-extension Int128 {
-  /// Divides `x` by rⁿ where r is the `radix`. Returns the quotient,
-  /// remainder, and digits
-  private static func div (x: UInt128, radix: Int) ->
-  (q:UInt128, r:UInt64, digits:Int) {
-    let maxDivisor: UInt64
-    let digits: Int
-    switch radix {
-      case 2:  maxDivisor = UInt64(9_223_372_036_854_775_808); digits = 63
-      case 8:  maxDivisor = UInt64(9_223_372_036_854_775_808); digits = 21
-      case 16: maxDivisor = UInt64(1_152_921_504_606_846_976); digits = 15
-      case 10: maxDivisor = UInt64(10_000_000_000_000_000_000); digits = 19
-      default:
-        /// Note: Max radix = 36 so
-        ///          36¹² = 4_738_381_338_321_616_896 < UInt64.max
-        var power = radix*radix         // squared
-        power *= power                  // 4th power
-        power = power * power * power   // 12th power
-        maxDivisor = UInt64(power); digits = 12
-    }
-    let result = x.quotientAndRemainder(dividingBy: UInt128(high: 0,
-                                                             low: maxDivisor))
-    return (result.quotient, result.remainder.low, digits)
-  }
-  
-  /// Converts the UInt128 `self` into a string with a given `radix`.  The
-  /// radix string can use uppercase characters if `uppercase` is true.
-  ///
-  /// Why convert numbers in chunks?  This approach reduces the number of
-  /// calls to division and modulo functions so is more efficient than a naïve
-  /// digit-based approach.  Ideally this code should be in the String module.
-  /// Further optimizations may be possible by using unchecked string buffers.
-  internal func string(withRadix radix:Int = 10, uppercase:Bool = false) ->
-  String {
-    guard 2...36 ~= radix else { return "0" }
-    if self == Self.zero { return "0" }
-    var result = (q:self.magnitude, r:UInt64(0), digits:0)
-    var str = ""
-    while result.q != Self.zero {
-      result = Self.div(x: result.q, radix: radix)
-      var temp = String(result.r, radix: radix, uppercase: uppercase)
-      if result.q != Self.zero {
-        temp = String(repeating: "0", count: result.digits-temp.count) + temp
-      }
-      str = temp + str
-    }
-    return str
-  }
-}
-
-extension Int128 : CustomStringConvertible {
-  public var description: String {
-    string(withRadix: 10)
-  }
-}
-
-extension Int128: CustomDebugStringConvertible {
-  public var debugDescription: String {
-    description
-  }
-}
-
-extension Int128 {
-  public init?<S: StringProtocol>(_ text: S, radix: Int = 10) {
-    guard !text.isEmpty else { return nil }
-    guard 2...36 ~= radix else { return nil }
-    self.init()
-    if let x : UInt128 = UInt128.value(from: text, radix: radix) {
-      self = Self(x)
-    } else {
-      return nil
-    }
-  }
-  
-  public init?(_ description: String) {
-    self.init(description, radix:10)
-  }
-}
-
-extension Int128 {
-  /// This method breaks `string` into pieces to reduce overhead of the
-  /// multiplications and allow UInt64 to work in converting larger numbers.
-  fileprivate static func value<S: StringProtocol>(
-      from string: S, radix: Int = 10) -> Self? {
-    // Handles signs and leading zeros
-    let uradix = UInt64(radix)
-    var s = String(string)
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 142)
-    var isNegative = false
-    if s.hasPrefix("-") { isNegative = true }
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 147)
-    if s.hasPrefix("+") { s.removeFirst() }
-    while s.hasPrefix("0") { s.removeFirst() }
-    
-    // Translate the string into a number
-    var r = zero
-    let _ = times(x: zero, timesRadix: uradix, toPower: 1) // initialize table
-    while !s.isEmpty {
-      // handle `chunk`-sized digits at a time
-      let chunk = s.prefix(powers.count)
-      let size = chunk.count; s.removeFirst(size)
-      if let uint = UInt64(chunk, radix: radix) {
-        if size != 0 {
-          r = times(x: r, timesRadix: uradix, toPower: size)
-        }
-        r += Self(high: 0, low: uint)
-      } else {
-        return nil
-      }
-    }
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 167)
-    if isNegative {
-      return -r
-    }
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 171)
-    return r
-  }
-  
-  /// Computed powers of rⁿ up to UInt64.max where r is the radix
-  private static var powers = [UInt64]()
-  
-  /// Multiplies `x` by rⁿ where r is the `radix` and returns the product
-  private static func times<T:FixedWidthInteger>(
-    x: T, timesRadix radix: UInt64, toPower n: Int) -> T {
-    // calculate the powers of the radix and store in a table
-    if powers.isEmpty || powers.first! != radix {
-      powers = [UInt64](); powers.reserveCapacity(20)
-      var t = UInt64(1)
-      while t < UInt64.max / radix {
-        t &*= radix
-        powers.append(t)
-      }
-    }
-    let radixToPower = powers[n-1]
-    let result = x * T(radixToPower)
-    return result
-  }
-}
-
-extension Int128: Equatable {
-  public static func == (_ lhs: Self, _ rhs: Self) -> Bool {
-    return (lhs.high, lhs.low) == (rhs.high, rhs.low)
-  }
-}
-
-extension Int128: Comparable {
-  public static func < (_ lhs: Self, _ rhs: Self) -> Bool {
-    (lhs.high, lhs.low) < (rhs.high, rhs.low)
-  }
-}
-
-extension Int128: Hashable {
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(low)
-    hasher.combine(high)
-  }
-}
-
-extension Int128 {
-  public var components: (high: High, low: Low) {
-    @inline(__always) get { (high, low) }
-    @inline(__always) set { (self.high, self.low) = (newValue.high, newValue.low) }
-  }
-}
-
-extension Int128: AdditiveArithmetic {
-  public static func - (_ lhs: Self, _ rhs: Self) -> Self {
-    let (result, overflow) = lhs.subtractingReportingOverflow(rhs)
-    precondition(!overflow, "Overflow in -")
-    return result
-  }
-
-  public static func -= (_ lhs: inout Self, _ rhs: Self) {
-    let (result, overflow) = lhs.subtractingReportingOverflow(rhs)
-    precondition(!overflow, "Overflow in -=")
-    lhs = result
-  }
-
-  public static func + (_ lhs: Self, _ rhs: Self) -> Self {
-    let (result, overflow) = lhs.addingReportingOverflow(rhs)
-    precondition(!overflow, "Overflow in +")
-    return result
-  }
-
-  public static func += (_ lhs: inout Self, _ rhs: Self) {
-    let (result, overflow) = lhs.addingReportingOverflow(rhs)
-    precondition(!overflow, "Overflow in +=")
-    lhs = result
-  }
-}
-
-extension Int128: Numeric {
-  public typealias Magnitude = UInt128
-
-  public var magnitude: Magnitude {
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 252)
-    var result = UInt128(bitPattern: self)
-    guard high._isNegative else { return result }
-    result.high = ~result.high
-    result.low = ~result.low
-    return result.addingReportingOverflow(.one).partialValue
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 260)
-  }
-
-  public init(_ magnitude: Magnitude) {
-    self.init(high: High(magnitude.high), low: magnitude.low)
-  }
-
-  public init<T: BinaryInteger>(_ source: T) {
-    guard let result = Self(exactly: source) else {
-      preconditionFailure("Value is outside the representable range")
-    }
-    self = result
-  }
-
-  public init?<T: BinaryInteger>(exactly source: T) {
-    // Can't represent a negative 'source' if Self is unsigned.
-    guard Self.isSigned || source >= 0 else {
-      return nil
-    }
-
-    // Is 'source' entirely representable in Low?
-    if let low = Low(exactly: source.magnitude) {
-      self.init(source._isNegative ? (~0, low._twosComplement) : (0, low))
-    } else {
-      // At this point we know source.bitWidth > High.bitWidth, or else we
-      // would've taken the first branch.
-      let lowInT = source & T(~0 as Low)
-      let highInT = source >> Low.bitWidth
-
-      let low = Low(lowInT)
-      guard let high = High(exactly: highInT) else {
-        return nil
-      }
-      self.init(high: high, low: low)
-    }
-  }
-
-  public static func * (_ lhs: Self, _ rhs: Self) -> Self {
-    let (result, overflow) = lhs.multipliedReportingOverflow(by: rhs)
-    precondition(!overflow, "Overflow in *")
-    return result
-  }
-
-  public static func *= (_ lhs: inout Self, _ rhs: Self) {
-    let (result, overflow) = lhs.multipliedReportingOverflow(by: rhs)
-    precondition(!overflow, "Overflow in *=")
-    lhs = result
-  }
-}
-
-extension Int128 {
-  public struct Words {
-    internal var _value: Int128
-
-    internal init(_ value: Int128) {
-      self._value = value
-    }
-  }
-}
-
-extension Int128.Words: RandomAccessCollection {
-  public typealias Element = UInt
-  public typealias Index = Int
-  public typealias Indices = Range<Int>
-  public typealias SubSequence = Slice<Self>
-
-  public var count: Int { 128 / UInt.bitWidth }
-  public var startIndex: Int { 0 }
-  public var endIndex: Int { count }
-  public var indices: Indices { startIndex ..< endIndex }
-  public func index(after i: Int) -> Int { i + 1 }
-  public func index(before i: Int) -> Int { i - 1 }
-
-  public subscript(position: Int) -> UInt {
-    get {
-      precondition(position >= 0 && position < endIndex,
-        "Word index out of range")
-      let shift = position &* UInt.bitWidth
-      precondition(shift < Int128.bitWidth)
-
-      let r = _wideMaskedShiftRight(
-        _value.components, UInt64(truncatingIfNeeded: shift))
-      return r.low._lowWord
-    }
-  }
-}
-
-extension Int128: FixedWidthInteger {
-  public var _lowWord: UInt {
-    low._lowWord
-  }
-
-  public var words: Words {
-    Words(self)
-  }
-
-  public static var isSigned: Bool {
-    true
-  }
-
-  public static var max: Self {
-    self.init(high: High.max, low: Low.max)
-  }
-
-  public static var min: Self {
-    self.init(high: High.min, low: Low.min)
-  }
-
-  public static var bitWidth: Int { 128 }
-
-  public func addingReportingOverflow(
-    _ rhs: Self
-  ) -> (partialValue: Self, overflow: Bool) {
-    let (r, o) = _wideAddReportingOverflow22(self.components, rhs.components)
-    return (Self(r), o)
-  }
-
-  public func subtractingReportingOverflow(
-    _ rhs: Self
-  ) -> (partialValue: Self, overflow: Bool) {
-    let (r, o) = _wideSubtractReportingOverflow22(
-      self.components, rhs.components)
-    return (Self(r), o)
-  }
-
-  public func multipliedReportingOverflow(
-    by rhs: Self
-  ) -> (partialValue: Self, overflow: Bool) {
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 388)
-    let isNegative = (self._isNegative != rhs._isNegative)
-    let (p, overflow) = self.magnitude.multipliedReportingOverflow(
-      by: rhs.magnitude)
-    let r = Int128(bitPattern: isNegative ? p._twosComplement : p)
-    return (r, overflow || (isNegative != r._isNegative))
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 404)
-  }
-
-  /// Returns the product of this value and the given 64-bit value, along with a
-  /// Boolean value indicating whether overflow occurred in the operation.
-  public func multipliedReportingOverflow(
-    by other: UInt64
-  ) -> (partialValue: Self, overflow: Bool) {
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 412)
-    let isNegative = self._isNegative
-    let (p, overflow) = self.magnitude.multipliedReportingOverflow(by: other)
-    let r = Int128(bitPattern: isNegative ? p._twosComplement : p)
-    return (r, overflow || (isNegative != r._isNegative))
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 423)
-  }
-
-  public func multiplied(by other: UInt64) -> Self {
-    let r = multipliedReportingOverflow(by: other)
-    precondition(!r.overflow, "Overflow in multiplication")
-    return r.partialValue
-  }
-
-  public func quotientAndRemainder(
-    dividingBy other: Self
-  ) -> (quotient: Self, remainder: Self) {
-    let (q, r) = _wideDivide22(
-      self.magnitude.components, by: other.magnitude.components)
-    let quotient = Self.Magnitude(q)
-    let remainder = Self.Magnitude(r)
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 439)
+    % if signed:
     let isNegative = (self.high._isNegative != other.high._isNegative)
     let quotient_ = (isNegative
       ? quotient == Self.min.magnitude ? Self.min : 0 - Self(quotient)
@@ -1056,7 +444,9 @@ extension Int128: FixedWidthInteger {
       ? 0 - Self(remainder)
       : Self(remainder))
     return (quotient_, remainder_)
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 450)
+    % else:
+    return (quotient, remainder)
+    % end
   }
 
   public func dividedReportingOverflow(
@@ -1119,7 +509,7 @@ extension Int128: FixedWidthInteger {
     let mid1 = sum(a.high, b.low, c.low)
     let mid2 = sum(b.high, c.high, mid1.high, d.low)
 
-    let high = Int128(
+    let high = ${U}Int128(
       high: High(d.high &+ mid2.high), // Note: this addition will never wrap
       low: mid2.low)
     let low = UInt128(
@@ -1137,7 +527,7 @@ extension Int128: FixedWidthInteger {
   public func dividingFullWidth(
     _ dividend: (high: Self, low: Self.Magnitude)
   ) -> (quotient: Self, remainder: Self) {
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 531)
+    % if signed:
     let m = _wideMagnitude22(dividend)
     let (quotient, remainder) = self.magnitude.dividingFullWidth(m)
 
@@ -1149,7 +539,12 @@ extension Int128: FixedWidthInteger {
       ? 0 - Self(remainder)
       : Self(remainder))
     return (quotient_, remainder_)
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 548)
+    % else:
+    let (q, r) = _wideDivide42(
+      (dividend.high.components, dividend.low.components),
+      by: self.components)
+    return (Self(q), Self(r))
+    % end
   }
 
   #if false // This triggers an unexpected type checking issue with `~0` in an
@@ -1280,24 +675,24 @@ extension Int128: FixedWidthInteger {
   }
 }
 
-extension Int128: Sendable {}
+extension ${U}Int128: Sendable {}
 
 // MARK: - BinaryFloatingPoint Interoperability
 extension BinaryFloatingPoint {
-    public init(_ value: Int128) {
+    public init(_ value: ${U}Int128) {
         precondition(value.high == 0,
                      "Value is too large to fit into a BinaryFloatingPoint.")
         self.init(value.low)
     }
 
-    public init?(exactly value: Int128) {
+    public init?(exactly value: ${U}Int128) {
         if value.high > 0 {
             return nil
         }
         self = Self(value.low)
     }
 }
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 696)
+% end
 
 extension BinaryInteger {
   @inline(__always)
@@ -1599,91 +994,43 @@ private func _wideDivide42<F: FixedWidthInteger & UnsignedInteger>(
 extension UInt128: UnsignedInteger {}
 extension Int128: SignedNumeric, SignedInteger {}
 
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1016)
+%{
+# This finds the magic numbers for signed division by a constant, following
+# the algorithm described in [Warren 2013, page 212].
+def magic(w, d):
+  nc = (2 ** (w - 1)) // d * d - 1
+  for p in range(2, 2 * w):
+    pp = 2 ** p
+    delta = d - pp % d
+    if pp > nc * delta:
+      m = (pp + delta) // d
+      overflow = m > 2 ** (w - 1) - 1
+      if overflow:
+        m = m - 2 ** w
+      w2 = w // 2
+      ml = m & (2 ** w2 - 1)
+      mh = m >> w2
+      return (mh, ml, p - w, overflow)
+  raise RuntimeError("No magic found")
+}%
 
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1020)
+% for exp in [18, 15, 12, 9, 6, 3]:
+%   d = 10 ** exp
+%   (mh, ml, s, overflow) = magic(128, d)
 extension Int128 {
-  internal func dividedBy1e18() -> (quotient: Self, remainder: Self) {
-    let m = Int128(high: 664613997892457936, low: 8336148766501648893)
+  internal func dividedBy1e${exp}() -> (quotient: Self, remainder: Self) {
+    let m = Int128(high: ${mh}, low: ${ml})
     var q = self.multipliedFullWidth(by: m).high
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1028)
-    q &>>= 55
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1030)
-    // Add 1 to q if self is negative
-    q &+= Int128(bitPattern: UInt128(bitPattern: self) &>> 127)
-    let r = self &- q &* (1000000000000000000 as Int128)
-    return (q, r)
-  }
-}
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1020)
-extension Int128 {
-  internal func dividedBy1e15() -> (quotient: Self, remainder: Self) {
-    let m = Int128(high: -8062150356639896359, low: 1125115960621402641)
-    var q = self.multipliedFullWidth(by: m).high
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1025)
+    % if overflow:
     q &+= self
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1028)
-    q &>>= 49
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1030)
+    % end
+    % if s > 0:
+    q &>>= ${s}
+    % end
     // Add 1 to q if self is negative
     q &+= Int128(bitPattern: UInt128(bitPattern: self) &>> 127)
-    let r = self &- q &* (1000000000000000 as Int128)
+    let r = self &- q &* (${d} as Int128)
     return (q, r)
   }
 }
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1020)
-extension Int128 {
-  internal func dividedBy1e12() -> (quotient: Self, remainder: Self) {
-    let m = Int128(high: 2535301200456458802, low: 18325113820324532597)
-    var q = self.multipliedFullWidth(by: m).high
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1028)
-    q &>>= 37
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1030)
-    // Add 1 to q if self is negative
-    q &+= Int128(bitPattern: UInt128(bitPattern: self) &>> 127)
-    let r = self &- q &* (1000000000000 as Int128)
-    return (q, r)
-  }
-}
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1020)
-extension Int128 {
-  internal func dividedBy1e9() -> (quotient: Self, remainder: Self) {
-    let m = Int128(high: 4951760157141521099, low: 11003425581274142745)
-    var q = self.multipliedFullWidth(by: m).high
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1028)
-    q &>>= 28
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1030)
-    // Add 1 to q if self is negative
-    q &+= Int128(bitPattern: UInt128(bitPattern: self) &>> 127)
-    let r = self &- q &* (1000000000 as Int128)
-    return (q, r)
-  }
-}
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1020)
-extension Int128 {
-  internal func dividedBy1e6() -> (quotient: Self, remainder: Self) {
-    let m = Int128(high: 604462909807314587, low: 6513323971497958161)
-    var q = self.multipliedFullWidth(by: m).high
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1028)
-    q &>>= 15
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1030)
-    // Add 1 to q if self is negative
-    q &+= Int128(bitPattern: UInt128(bitPattern: self) &>> 127)
-    let r = self &- q &* (1000000 as Int128)
-    return (q, r)
-  }
-}
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1020)
-extension Int128 {
-  internal func dividedBy1e3() -> (quotient: Self, remainder: Self) {
-    let m = Int128(high: 4722366482869645213, low: 12838933875301847925)
-    var q = self.multipliedFullWidth(by: m).high
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1028)
-    q &>>= 8
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1030)
-    // Add 1 to q if self is negative
-    q &+= Int128(bitPattern: UInt128(bitPattern: self) &>> 127)
-    let r = self &- q &* (1000 as Int128)
-    return (q, r)
-  }
-}
+% end

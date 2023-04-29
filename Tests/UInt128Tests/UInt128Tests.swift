@@ -1058,22 +1058,13 @@ final class FloatingPointInterworkingTests : XCTestCase {
             XCTAssertEqual(Float(exactly: test.input), test.output)
         }
     }
-
-//    func testSignBitIndex() {
-//        var tests = [(input: UInt128.min, output: Int(-1))]
-//        tests.append((input: UInt128.max, output: Int(127)))
-//
-//        tests.forEach { test in
-//            XCTAssertEqual(test.input.signBitIndex, test.output)
-//        }
-//    }
 }
 
 final class BasicUInt128Tests: XCTestCase {
     
     func testBasicMath() throws {
         // Basic go/nogo test to verify the basic operations
-        let x = UInt128("123456789012345678901234567890")
+        let x = UInt128("123456789012345678901234567890")!
         let y = UInt128(100_000_000)
         let z = x + y
         let v = x - y
@@ -1118,7 +1109,7 @@ final class BasicUInt128Tests: XCTestCase {
     
     func testPerformanceUInt128Multiply() {
         // Multiply is 13X faster than UInt128 from Gerber
-        let x = UInt128("123456789012345678901234567890")
+        let x = UInt128("123456789012345678901234567890")!
         let y = UInt128(100_000_000)
         self.measure {
             for _ in 1...1000 {
@@ -1129,7 +1120,7 @@ final class BasicUInt128Tests: XCTestCase {
     
     func testPerformanceUInt128Divide() {
         // Divide is 40X faster than UInt128 from Gerber
-        let x = UInt128("123456789012345678901234567890")
+        let x = UInt128("123456789012345678901234567890")!
         let y = UInt128(100_000_000)
         self.measure {
             for _ in 1...1000 {
