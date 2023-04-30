@@ -1,17 +1,21 @@
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1)
-//===----------------------------------------------------------------------===//
-//
-// This source file is part of the Swift.org open source project
-//
-// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
-// Licensed under Apache License v2.0 with Runtime Library Exception
-//
-// See https://swift.org/LICENSE.txt for license information
-// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-//
-//===----------------------------------------------------------------------===//
+/**
+Copyright © 2023 Computer Inspirations. All rights reserved.
+Portions are Copyright (c) 2014 - 2021 Apple Inc. and the
+Swift project authors
 
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 17)
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 /// A 128-bit unsigned integer type.
 public struct UInt128 : Codable {
   public typealias High = UInt64
@@ -54,24 +58,29 @@ extension UInt128 {
   /// remainder, and digits
   private static func div (x: UInt128, radix: Int) ->
   (q:UInt128, r:UInt64, digits:Int) {
-    let maxDivisor: UInt64
     let digits: Int
+    let maxDivisor: UInt64
+    let r: (quotient:Magnitude, remainder:Magnitude)
+
+    // set the maximum radix power for the divisor
     switch radix {
-      case 2:  maxDivisor = UInt64(9_223_372_036_854_775_808); digits = 63
-      case 8:  maxDivisor = UInt64(9_223_372_036_854_775_808); digits = 21
-      case 16: maxDivisor = UInt64(1_152_921_504_606_846_976); digits = 15
-      case 10: maxDivisor = UInt64(10_000_000_000_000_000_000); digits = 19
+      case  2: maxDivisor = 0x8000_0000_0000_0000; digits = 63
+      case  4: maxDivisor = 0x4000_0000_0000_0000; digits = 31
+      case  8: maxDivisor = 0x8000_0000_0000_0000; digits = 21
+      case 10: maxDivisor = 10_000_000_000_000_000_000; digits = 19
+      case 16: maxDivisor = 0x1000_0000_0000_0000; digits = 15
+      case 32: maxDivisor = 0x1000_0000_0000_0000; digits = 12
       default:
-        /// Note: Max radix = 36 so
-        ///          36¹² = 4_738_381_338_321_616_896 < UInt64.max
-        var power = radix*radix         // squared
+        // Compute the maximum divisor for a worst-case radix of 36
+        // Max radix = 36 so 36¹² = 4_738_381_338_321_616_896 < UInt64.max
+        var power = radix * radix       // squared
         power *= power                  // 4th power
         power = power * power * power   // 12th power
-        maxDivisor = UInt64(power); digits = 12
+        maxDivisor = UInt64(power)
+        digits = 12
     }
-    let result = x.quotientAndRemainder(dividingBy: UInt128(high: 0,
-                                                             low: maxDivisor))
-    return (result.quotient, result.remainder.low, digits)
+    r = x.quotientAndRemainder(dividingBy: UInt128(high: 0, low: maxDivisor))
+    return (r.quotient, r.remainder.low, digits)
   }
   
   /// Converts the UInt128 `self` into a string with a given `radix`.  The
@@ -81,8 +90,7 @@ extension UInt128 {
   /// calls to division and modulo functions so is more efficient than a naïve
   /// digit-based approach.  Ideally this code should be in the String module.
   /// Further optimizations may be possible by using unchecked string buffers.
-  internal func string(withRadix radix:Int = 10, uppercase:Bool = false) ->
-  String {
+  internal func _description(radix:Int=10, uppercase:Bool=false) -> String {
     guard 2...36 ~= radix else { return "0" }
     if self == Self.zero { return "0" }
     var result = (q:self.magnitude, r:UInt64(0), digits:0)
@@ -99,9 +107,15 @@ extension UInt128 {
   }
 }
 
+extension String {
+  public init(_ n: UInt128, radix: Int = 10, uppercase: Bool = false) {
+    self = n._description(radix: radix, uppercase: uppercase)
+  }
+}
+
 extension UInt128 : CustomStringConvertible {
   public var description: String {
-    string(withRadix: 10)
+    _description(radix: 10)
   }
 }
 
@@ -136,9 +150,7 @@ extension UInt128 {
     // Handles signs and leading zeros
     let uradix = UInt64(radix)
     var s = String(string)
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 145)
     if s.hasPrefix("-") { return nil }
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 147)
     if s.hasPrefix("+") { s.removeFirst() }
     while s.hasPrefix("0") { s.removeFirst() }
     
@@ -158,7 +170,6 @@ extension UInt128 {
         return nil
       }
     }
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 171)
     return r
   }
   
@@ -239,9 +250,7 @@ extension UInt128: Numeric {
   public typealias Magnitude = UInt128
 
   public var magnitude: Magnitude {
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 258)
     return self
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 260)
   }
 
   public init(_ magnitude: Magnitude) {
@@ -369,7 +378,6 @@ extension UInt128: FixedWidthInteger {
   public func multipliedReportingOverflow(
     by rhs: Self
   ) -> (partialValue: Self, overflow: Bool) {
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 394)
     let h1 = self.high.multipliedReportingOverflow(by: rhs.low)
     let h2 = self.low.multipliedReportingOverflow(by: rhs.high)
     let h3 = h1.partialValue.addingReportingOverflow(h2.partialValue)
@@ -379,7 +387,6 @@ extension UInt128: FixedWidthInteger {
       (self.high != 0 && rhs.high != 0)
       || h1.overflow || h2.overflow || h3.overflow || high.overflow)
     return (Self(high: high.partialValue, low: l), overflow)
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 404)
   }
 
   /// Returns the product of this value and the given 64-bit value, along with a
@@ -387,13 +394,11 @@ extension UInt128: FixedWidthInteger {
   public func multipliedReportingOverflow(
     by other: UInt64
   ) -> (partialValue: Self, overflow: Bool) {
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 417)
     let h1 = self.high.multipliedReportingOverflow(by: other)
     let (h2, l) = self.low.multipliedFullWidth(by: other)
     let high = h1.partialValue.addingReportingOverflow(h2)
     let overflow = h1.overflow || high.overflow
     return (Self(high: high.partialValue, low: l), overflow)
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 423)
   }
 
   public func multiplied(by other: UInt64) -> Self {
@@ -409,9 +414,7 @@ extension UInt128: FixedWidthInteger {
       self.magnitude.components, by: other.magnitude.components)
     let quotient = Self.Magnitude(q)
     let remainder = Self.Magnitude(r)
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 448)
     return (quotient, remainder)
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 450)
   }
 
   public func dividedReportingOverflow(
@@ -492,12 +495,10 @@ extension UInt128: FixedWidthInteger {
   public func dividingFullWidth(
     _ dividend: (high: Self, low: Self.Magnitude)
   ) -> (quotient: Self, remainder: Self) {
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 543)
     let (q, r) = _wideDivide42(
       (dividend.high.components, dividend.low.components),
       by: self.components)
     return (Self(q), Self(r))
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 548)
   }
 
   #if false // This triggers an unexpected type checking issue with `~0` in an
@@ -645,7 +646,6 @@ extension BinaryFloatingPoint {
         self = Self(value.low)
     }
 }
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 17)
 /// A 128-bit signed integer type.
 public struct Int128 : Codable {
   public typealias High = Int64
@@ -688,35 +688,39 @@ extension Int128 {
   /// remainder, and digits
   private static func div (x: UInt128, radix: Int) ->
   (q:UInt128, r:UInt64, digits:Int) {
-    let maxDivisor: UInt64
     let digits: Int
+    let maxDivisor: UInt64
+    let r: (quotient:Magnitude, remainder:Magnitude)
+
+    // set the maximum radix power for the divisor
     switch radix {
-      case 2:  maxDivisor = UInt64(9_223_372_036_854_775_808); digits = 63
-      case 8:  maxDivisor = UInt64(9_223_372_036_854_775_808); digits = 21
-      case 16: maxDivisor = UInt64(1_152_921_504_606_846_976); digits = 15
-      case 10: maxDivisor = UInt64(10_000_000_000_000_000_000); digits = 19
+      case  2: maxDivisor = 0x8000_0000_0000_0000; digits = 63
+      case  4: maxDivisor = 0x4000_0000_0000_0000; digits = 31
+      case  8: maxDivisor = 0x8000_0000_0000_0000; digits = 21
+      case 10: maxDivisor = 10_000_000_000_000_000_000; digits = 19
+      case 16: maxDivisor = 0x1000_0000_0000_0000; digits = 15
+      case 32: maxDivisor = 0x1000_0000_0000_0000; digits = 12
       default:
-        /// Note: Max radix = 36 so
-        ///          36¹² = 4_738_381_338_321_616_896 < UInt64.max
-        var power = radix*radix         // squared
+        // Compute the maximum divisor for a worst-case radix of 36
+        // Max radix = 36 so 36¹² = 4_738_381_338_321_616_896 < UInt64.max
+        var power = radix * radix       // squared
         power *= power                  // 4th power
         power = power * power * power   // 12th power
-        maxDivisor = UInt64(power); digits = 12
+        maxDivisor = UInt64(power)
+        digits = 12
     }
-    let result = x.quotientAndRemainder(dividingBy: UInt128(high: 0,
-                                                             low: maxDivisor))
-    return (result.quotient, result.remainder.low, digits)
+    r = x.quotientAndRemainder(dividingBy: UInt128(high: 0, low: maxDivisor))
+    return (r.quotient, r.remainder.low, digits)
   }
   
-  /// Converts the UInt128 `self` into a string with a given `radix`.  The
+  /// Converts the Int128 `self` into a string with a given `radix`.  The
   /// radix string can use uppercase characters if `uppercase` is true.
   ///
   /// Why convert numbers in chunks?  This approach reduces the number of
   /// calls to division and modulo functions so is more efficient than a naïve
   /// digit-based approach.  Ideally this code should be in the String module.
   /// Further optimizations may be possible by using unchecked string buffers.
-  internal func string(withRadix radix:Int = 10, uppercase:Bool = false) ->
-  String {
+  internal func _description(radix:Int=10, uppercase:Bool=false) -> String {
     guard 2...36 ~= radix else { return "0" }
     if self == Self.zero { return "0" }
     var result = (q:self.magnitude, r:UInt64(0), digits:0)
@@ -729,13 +733,22 @@ extension Int128 {
       }
       str = temp + str
     }
+    if self._isNegative {
+      return "-" + str
+    }
     return str
+  }
+}
+
+extension String {
+  public init(_ n: Int128, radix: Int = 10, uppercase: Bool = false) {
+    self = n._description(radix: radix, uppercase: uppercase)
   }
 }
 
 extension Int128 : CustomStringConvertible {
   public var description: String {
-    string(withRadix: 10)
+    _description(radix: 10)
   }
 }
 
@@ -770,10 +783,8 @@ extension Int128 {
     // Handles signs and leading zeros
     let uradix = UInt64(radix)
     var s = String(string)
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 142)
     var isNegative = false
     if s.hasPrefix("-") { isNegative = true }
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 147)
     if s.hasPrefix("+") { s.removeFirst() }
     while s.hasPrefix("0") { s.removeFirst() }
     
@@ -793,11 +804,9 @@ extension Int128 {
         return nil
       }
     }
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 167)
     if isNegative {
       return -r
     }
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 171)
     return r
   }
   
@@ -878,13 +887,11 @@ extension Int128: Numeric {
   public typealias Magnitude = UInt128
 
   public var magnitude: Magnitude {
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 252)
     var result = UInt128(bitPattern: self)
     guard high._isNegative else { return result }
     result.high = ~result.high
     result.low = ~result.low
     return result.addingReportingOverflow(.one).partialValue
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 260)
   }
 
   public init(_ magnitude: Magnitude) {
@@ -1012,13 +1019,11 @@ extension Int128: FixedWidthInteger {
   public func multipliedReportingOverflow(
     by rhs: Self
   ) -> (partialValue: Self, overflow: Bool) {
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 388)
     let isNegative = (self._isNegative != rhs._isNegative)
     let (p, overflow) = self.magnitude.multipliedReportingOverflow(
       by: rhs.magnitude)
     let r = Int128(bitPattern: isNegative ? p._twosComplement : p)
     return (r, overflow || (isNegative != r._isNegative))
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 404)
   }
 
   /// Returns the product of this value and the given 64-bit value, along with a
@@ -1026,12 +1031,10 @@ extension Int128: FixedWidthInteger {
   public func multipliedReportingOverflow(
     by other: UInt64
   ) -> (partialValue: Self, overflow: Bool) {
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 412)
     let isNegative = self._isNegative
     let (p, overflow) = self.magnitude.multipliedReportingOverflow(by: other)
     let r = Int128(bitPattern: isNegative ? p._twosComplement : p)
     return (r, overflow || (isNegative != r._isNegative))
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 423)
   }
 
   public func multiplied(by other: UInt64) -> Self {
@@ -1047,7 +1050,6 @@ extension Int128: FixedWidthInteger {
       self.magnitude.components, by: other.magnitude.components)
     let quotient = Self.Magnitude(q)
     let remainder = Self.Magnitude(r)
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 439)
     let isNegative = (self.high._isNegative != other.high._isNegative)
     let quotient_ = (isNegative
       ? quotient == Self.min.magnitude ? Self.min : 0 - Self(quotient)
@@ -1056,7 +1058,6 @@ extension Int128: FixedWidthInteger {
       ? 0 - Self(remainder)
       : Self(remainder))
     return (quotient_, remainder_)
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 450)
   }
 
   public func dividedReportingOverflow(
@@ -1137,7 +1138,6 @@ extension Int128: FixedWidthInteger {
   public func dividingFullWidth(
     _ dividend: (high: Self, low: Self.Magnitude)
   ) -> (quotient: Self, remainder: Self) {
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 531)
     let m = _wideMagnitude22(dividend)
     let (quotient, remainder) = self.magnitude.dividingFullWidth(m)
 
@@ -1149,7 +1149,6 @@ extension Int128: FixedWidthInteger {
       ? 0 - Self(remainder)
       : Self(remainder))
     return (quotient_, remainder_)
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 548)
   }
 
   #if false // This triggers an unexpected type checking issue with `~0` in an
@@ -1297,7 +1296,6 @@ extension BinaryFloatingPoint {
         self = Self(value.low)
     }
 }
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 696)
 
 extension BinaryInteger {
   @inline(__always)
@@ -1312,6 +1310,73 @@ extension FixedWidthInteger {
 }
 
 
+extension Int128 {
+  internal func dividedBy1e18() -> (quotient: Self, remainder: Self) {
+    let m = Int128(high: 664613997892457936, low: 8336148766501648893)
+    var q = self.multipliedFullWidth(by: m).high
+    q &>>= 55
+    // Add 1 to q if self is negative
+    q &+= Int128(bitPattern: UInt128(bitPattern: self) &>> 127)
+    let r = self &- q &* (1000000000000000000 as Int128)
+    return (q, r)
+  }
+}
+extension Int128 {
+  internal func dividedBy1e15() -> (quotient: Self, remainder: Self) {
+    let m = Int128(high: -8062150356639896359, low: 1125115960621402641)
+    var q = self.multipliedFullWidth(by: m).high
+    q &+= self
+    q &>>= 49
+    // Add 1 to q if self is negative
+    q &+= Int128(bitPattern: UInt128(bitPattern: self) &>> 127)
+    let r = self &- q &* (1000000000000000 as Int128)
+    return (q, r)
+  }
+}
+extension Int128 {
+  internal func dividedBy1e12() -> (quotient: Self, remainder: Self) {
+    let m = Int128(high: 2535301200456458802, low: 18325113820324532597)
+    var q = self.multipliedFullWidth(by: m).high
+    q &>>= 37
+    // Add 1 to q if self is negative
+    q &+= Int128(bitPattern: UInt128(bitPattern: self) &>> 127)
+    let r = self &- q &* (1000000000000 as Int128)
+    return (q, r)
+  }
+}
+extension Int128 {
+  internal func dividedBy1e9() -> (quotient: Self, remainder: Self) {
+    let m = Int128(high: 4951760157141521099, low: 11003425581274142745)
+    var q = self.multipliedFullWidth(by: m).high
+    q &>>= 28
+    // Add 1 to q if self is negative
+    q &+= Int128(bitPattern: UInt128(bitPattern: self) &>> 127)
+    let r = self &- q &* (1000000000 as Int128)
+    return (q, r)
+  }
+}
+extension Int128 {
+  internal func dividedBy1e6() -> (quotient: Self, remainder: Self) {
+    let m = Int128(high: 604462909807314587, low: 6513323971497958161)
+    var q = self.multipliedFullWidth(by: m).high
+    q &>>= 15
+    // Add 1 to q if self is negative
+    q &+= Int128(bitPattern: UInt128(bitPattern: self) &>> 127)
+    let r = self &- q &* (1000000 as Int128)
+    return (q, r)
+  }
+}
+extension Int128 {
+  internal func dividedBy1e3() -> (quotient: Self, remainder: Self) {
+    let m = Int128(high: 4722366482869645213, low: 12838933875301847925)
+    var q = self.multipliedFullWidth(by: m).high
+    q &>>= 8
+    // Add 1 to q if self is negative
+    q &+= Int128(bitPattern: UInt128(bitPattern: self) &>> 127)
+    let r = self &- q &* (1000 as Int128)
+    return (q, r)
+  }
+}
 
 private typealias _Wide2<F: FixedWidthInteger> =
   (high: F, low: F.Magnitude)
@@ -1599,91 +1664,3 @@ private func _wideDivide42<F: FixedWidthInteger & UnsignedInteger>(
 extension UInt128: UnsignedInteger {}
 extension Int128: SignedNumeric, SignedInteger {}
 
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1016)
-
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1020)
-extension Int128 {
-  internal func dividedBy1e18() -> (quotient: Self, remainder: Self) {
-    let m = Int128(high: 664613997892457936, low: 8336148766501648893)
-    var q = self.multipliedFullWidth(by: m).high
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1028)
-    q &>>= 55
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1030)
-    // Add 1 to q if self is negative
-    q &+= Int128(bitPattern: UInt128(bitPattern: self) &>> 127)
-    let r = self &- q &* (1000000000000000000 as Int128)
-    return (q, r)
-  }
-}
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1020)
-extension Int128 {
-  internal func dividedBy1e15() -> (quotient: Self, remainder: Self) {
-    let m = Int128(high: -8062150356639896359, low: 1125115960621402641)
-    var q = self.multipliedFullWidth(by: m).high
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1025)
-    q &+= self
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1028)
-    q &>>= 49
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1030)
-    // Add 1 to q if self is negative
-    q &+= Int128(bitPattern: UInt128(bitPattern: self) &>> 127)
-    let r = self &- q &* (1000000000000000 as Int128)
-    return (q, r)
-  }
-}
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1020)
-extension Int128 {
-  internal func dividedBy1e12() -> (quotient: Self, remainder: Self) {
-    let m = Int128(high: 2535301200456458802, low: 18325113820324532597)
-    var q = self.multipliedFullWidth(by: m).high
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1028)
-    q &>>= 37
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1030)
-    // Add 1 to q if self is negative
-    q &+= Int128(bitPattern: UInt128(bitPattern: self) &>> 127)
-    let r = self &- q &* (1000000000000 as Int128)
-    return (q, r)
-  }
-}
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1020)
-extension Int128 {
-  internal func dividedBy1e9() -> (quotient: Self, remainder: Self) {
-    let m = Int128(high: 4951760157141521099, low: 11003425581274142745)
-    var q = self.multipliedFullWidth(by: m).high
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1028)
-    q &>>= 28
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1030)
-    // Add 1 to q if self is negative
-    q &+= Int128(bitPattern: UInt128(bitPattern: self) &>> 127)
-    let r = self &- q &* (1000000000 as Int128)
-    return (q, r)
-  }
-}
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1020)
-extension Int128 {
-  internal func dividedBy1e6() -> (quotient: Self, remainder: Self) {
-    let m = Int128(high: 604462909807314587, low: 6513323971497958161)
-    var q = self.multipliedFullWidth(by: m).high
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1028)
-    q &>>= 15
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1030)
-    // Add 1 to q if self is negative
-    q &+= Int128(bitPattern: UInt128(bitPattern: self) &>> 127)
-    let r = self &- q &* (1000000 as Int128)
-    return (q, r)
-  }
-}
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1020)
-extension Int128 {
-  internal func dividedBy1e3() -> (quotient: Self, remainder: Self) {
-    let m = Int128(high: 4722366482869645213, low: 12838933875301847925)
-    var q = self.multipliedFullWidth(by: m).high
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1028)
-    q &>>= 8
-// ###sourceLocation(file: "/Users/mikeg/Work/Packages/UInt128/Int128.swift.gyb", line: 1030)
-    // Add 1 to q if self is negative
-    q &+= Int128(bitPattern: UInt128(bitPattern: self) &>> 127)
-    let r = self &- q &* (1000 as Int128)
-    return (q, r)
-  }
-}
