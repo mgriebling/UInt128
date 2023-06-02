@@ -8,7 +8,7 @@ speed as Apple's implementation. If you find something faster, please let me kno
 
 This package is compliant with the following protocols:
 
-1. UnsignedInteger
+1. UnsignedInteger/SignedInteger
 2. BinaryInteger
 3. FixedWidthInteger
 4. Numeric
@@ -25,7 +25,17 @@ This package is compliant with the following protocols:
 11. Sendable
 12. Codable
 
-I will be adding support for the new StaticBigInt, once it is generally available.
+This package now supports `StaticBigInt`.  Unfortunately, this means you need
+to have one of following configurations (or higher) 
+
+1. macOS 13.3+, 
+2. iOS 16.4+, 
+3. macCatalyst 16.4+, 
+4. tvOS 16.4+,
+5. watchOS 9.4+
+
+If you don't have these configurations, you need to use a previous release of
+UInt128/Int128.
 
 ## Installation
 This library includes Swift Package support out of the box.
@@ -49,8 +59,9 @@ can do with literal integers (e.g., 123\_456).
 
 For example:
 
-    let uInt128ByString = UInt128("ffaabbcc00129823fa9a12d4aa87f498", radix:16)!
-    let uInt128ByInteger: UInt128 = 1234
+  let uInt128ByString = UInt128("ffaabbcc00129823fa9a12d4aa87f498", radix:16)!
+  let uInt128ByLiteral: UInt128 = 0xffaa_bbcc_0012_9823_fa9a_12d4_aa87_f498
+  let uInt128ByInteger: UInt128 = 1234
     
 The `Int128.swift.gyb` file is the source for the generated file `UInt128.swift` (containing
 both `Int128` and `UInt128` number types). If you would like to contribute to this
