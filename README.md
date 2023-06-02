@@ -48,14 +48,16 @@ single file in order to support this use case.
 ## Usage
 Since this library fully implements the UnsignedInteger or SignedInteger protocol, 
 you can use this data type just like any other native UInt data type. For numbers larger
-than UIntMax, you'll either want to call the `init(high: UInt64, low: UInt64)` 
-initializer, or, use the `init(_ source: String, radix: Int)` initializer to
-create an instance with a string.  The string can be in any radix up to base 36
-including binary, octal, decimal orr hexadecimal, by using a corresponding `radix` 
+than UIntMax, you can enter numbers directly as literals (see example).  If you prefer,
+the `init(high: UInt64, low: UInt64)`, or the `init(_ source: String, radix: Int)` initializers
+can also be used to create a UInt128/Int128. A string can be in any radix up to base 36
+including binary, octal, decimal or hexadecimal, by using a corresponding `radix` 
 argument. Strings **cannot** contain spaces, underscores, or non-radix digits. Illegal 
 input strings will return nil (previously they quietly returned 0).  Note: This is probably confusing
 to newbies who may want to use underscores to separate digit groups as they
-can do with literal integers (e.g., 123\_456).
+can do with literal integers (e.g., 123\_456), but it is the *Apple way*.
+Fortunately, with big literal number support (aka `StaticBigInt`), you never
+need to use string initializers again, unless you need oddball radices.
 
 For example:
 ```Swift
