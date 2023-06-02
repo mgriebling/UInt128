@@ -34,7 +34,7 @@ import XCTest
 @testable import UInt128
 
 // A Int128 with a decently complicated bit pattern
-let bizarreInt128 = Int128("0xf1f3f5f7f9fbfdfffefcfaf0f8f6f4f2")
+let bizarreInt128 = Int128(0xf1f3f5f7_f9fbfdff_fefcfaf0_f8f6f4f2)
 
 /// User tests that act as a basic smoke test on library functionality.
 class SystemInt128Tests : XCTestCase {
@@ -157,9 +157,9 @@ class FixedWidthInteger128Tests : XCTestCase {
   func endianTests() -> [(input: Int128, byteSwapped: Int128)] {
     var tests = [(input: Int128(), byteSwapped: Int128())]
     tests.append((input: Int128(1),
-                  byteSwapped: Int128(high: 0x100000000000000, low: 0)))
-    tests.append((input: Int128(high: 0x71F3F5F7F9FBFDFF, low: 0xFEFCFAF0F8F6F472),
-                  byteSwapped: Int128(high: 0x72F4F6F8F0FAFCFE, low: 0xFFFDFBF9F7F5F371)))
+                  byteSwapped: Int128(0x100000000000000_0000000000000000)))
+    tests.append((input: Int128(0x71F3F5F7F9FBFDFF_FEFCFAF0F8F6F472),
+                  byteSwapped: Int128(0x72F4F6F8F0FAFCFE_FFFDFBF9F7F5F371)))
     return tests
   }
   
@@ -378,7 +378,7 @@ class FixedWidthInteger128Tests : XCTestCase {
     // (1, 0) / 4 = 170141183460469231731687303715884105728r0
     tests.append((dividend: (high: Int128(1), low: UInt128.zero),
                   divisor: Int128(4),
-                  result: (quotient: try XCTUnwrap(Int128("85070591730234615865843651857942052864")),
+                  result: (quotient: try XCTUnwrap(Int128(85070591730234615865843651857942052864)),
                            remainder: 0)))
     
     tests.forEach { test in
@@ -574,9 +574,9 @@ class BinaryInteger128Tests : XCTestCase {
     tests.append((lhs: Int128(high: Int64.min, low: UInt64.max),
                   rhs: Int128(high: Int64.max, low: UInt64.min),
                   result: Int128.zero))
-    tests.append((lhs: Int128(high: 0x71F3F5F7F9FBFDFF, low: 0xFEFCFAF0F8F6F4F2),
-                  rhs: Int128(high: 0x72F4F6F8F0FAFCFE, low: 0xFFFDFBF9F7F5F3F1),
-                  result: Int128(high: 0x70F0F4F0F0FAFCFE, low: 0xFEFCFAF0F0F4F0F0)))
+    tests.append((lhs:    Int128(0x71F3F5F7F9FBFDFF_FEFCFAF0F8F6F4F2),
+                  rhs:    Int128(0x72F4F6F8F0FAFCFE_FFFDFBF9F7F5F3F1),
+                  result: Int128(0x70F0F4F0F0FAFCFE_FEFCFAF0F0F4F0F0)))
     tests.append((lhs: Int128.max, rhs: Int128.max, result: Int128.max))
     
     tests.forEach { test in
@@ -594,9 +594,9 @@ class BinaryInteger128Tests : XCTestCase {
     tests.append((lhs: Int128(high: Int64.zero, low: UInt64.max),
                   rhs: Int128(high: Int64.max, low: UInt64.min),
                   result: Int128.max))
-    tests.append((lhs: Int128(high: 0x71F3F5F7F9FBFDFF, low: 0xFEFCFAF0F8F6F4F2),
-                  rhs: Int128(high: 0x72F4F6F8F0FAFCFE, low: 0xFFFDFBF9F7F5F3F1),
-                  result: Int128(high: 0x73F7F7FFF9FBFDFF, low: 18446176699939289075)))
+    tests.append((lhs:    Int128(0x71F3F5F7F9FBFDFF_FEFCFAF0F8F6F4F2),
+                  rhs:    Int128(0x72F4F6F8F0FAFCFE_FFFDFBF9F7F5F3F1),
+                  result: Int128(0x73F7F7FFF9FBFDFF_FFFDFBF9FFF7F7F3)))
     tests.append((lhs: Int128.max, rhs: Int128.max, result: Int128.max))
     
     tests.forEach { test in
@@ -614,9 +614,9 @@ class BinaryInteger128Tests : XCTestCase {
     tests.append((lhs: Int128(high: Int64.zero, low: UInt64.max),
                   rhs: Int128(high: Int64.max, low: UInt64.min),
                   result: Int128.max))
-    tests.append((lhs: Int128(high: 0x71F3F5F7F9FBFDFF, low: 0xFEFCFAF0F8F6F4F2),
-                  rhs: Int128(high: 0x72F4F6F8F0FAFCFE, low: 0xFFFDFBF9F7F5F3F1),
-                  result: Int128(high: 218146470061211905, low: 72340207432828675)))
+    tests.append((lhs:    Int128(0x71F3F5F7F9FBFDFF_FEFCFAF0F8F6F4F2),
+                  rhs:    Int128(0x72F4F6F8F0FAFCFE_FFFDFBF9F7F5F3F1),
+                  result: Int128(0x0307030F09010101_010101090F030703)))
     tests.append((lhs: Int128.max, rhs: Int128.max, result: Int128.zero))
     
     tests.forEach { test in
@@ -858,7 +858,8 @@ class CustomStringConvertibleInt128Tests : XCTestCase {
       18: "2d3fgb0b9cg4bd2g",
       36: "3w5e11264sgsg"]))
     tests.append((input: Int128.max, result: [
-      2: "1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+      2: "11111111111111111111111111111111111111111111111111111111111111111" +
+         "11111111111111111111111111111111111111111111111111111111111111",
       8: "1777777777777777777777777777777777777777777",
       10: "170141183460469231731687303715884105727",
       16: "7fffffffffffffffffffffffffffffff",
@@ -982,7 +983,7 @@ class FailableStringInitializerInt128Tests : XCTestCase {
 
 final class CodableInt128Tests : XCTestCase {
   func testCodable() throws {
-    let enc = try XCTUnwrap(Int128("170141183460469231731687303715884105727"))
+    let enc = try XCTUnwrap(Int128(170141183460469231731687303715884105727))
     let data = try! JSONEncoder().encode(enc)
     let dec = try! JSONDecoder().decode(Int128.self, from: data)
     XCTAssertEqual(enc, dec)
@@ -1018,7 +1019,7 @@ final class BasicInt128Tests: XCTestCase {
   
   func testBasicMath() throws {
     // Basic go/nogo test to verify the basic operations
-    let x = Int128("123456789012345678901234567890")!
+    let x = Int128(123_456_789_012_345_678_901_234_567_890)
     let y = Int128(100_000_000)
     let z = x + y
     let v = x - y
@@ -1029,7 +1030,7 @@ final class BasicInt128Tests: XCTestCase {
     let e = x | y
     let f = x ^ y
     let g = ~x
-    let h = Int128("1234567890ABCDEF1234567890ABCDEF", radix: 16)!
+    let h = Int128(0x1234_5678_90AB_CDEF_1234_5678_90AB_CDEF)
     print("x = \(x); y = \(y)")
     print("x + y = \(z)")
     print("x - y = \(v)")
@@ -1063,7 +1064,7 @@ final class BasicInt128Tests: XCTestCase {
   
   func testPerformanceInt128Multiply() {
     // Multiply is 13X faster than Int128 from Gerber
-    let x = Int128("123456789012345678901234567890")!
+    let x = Int128(123_456_789_012_345_678_901_234_567_890)
     let y = Int128(100_000_000)
     self.measure {
       for _ in 1...1000 {
@@ -1074,7 +1075,7 @@ final class BasicInt128Tests: XCTestCase {
   
   func testPerformanceInt128Divide() {
     // Divide is 40X faster than Int128 from Gerber
-    let x = Int128("123456789012345678901234567890")!
+    let x = Int128(123_456_789_012_345_678_901_234_567_890)
     let y = Int128(100_000_000)
     self.measure {
       for _ in 1...1000 {
