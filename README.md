@@ -58,10 +58,11 @@ to newbies who may want to use underscores to separate digit groups as they
 can do with literal integers (e.g., 123\_456).
 
 For example:
-
+```Swift
   let uInt128ByString = UInt128("ffaabbcc00129823fa9a12d4aa87f498", radix:16)!
   let uInt128ByLiteral: UInt128 = 0xffaa_bbcc_0012_9823_fa9a_12d4_aa87_f498
   let uInt128ByInteger: UInt128 = 1234
+```
     
 The `Int128.swift.gyb` file is the source for the generated file `UInt128.swift` (containing
 both `Int128` and `UInt128` number types). If you would like to contribute to this
