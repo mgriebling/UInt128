@@ -56,20 +56,19 @@ public struct UInt128 : Codable {
 extension UInt128 {
   /// Divides `x` by rⁿ where r is the `radix`. Returns the quotient,
   /// remainder, and digits
-  private static func div (x: UInt128, radix: Int) ->
-  (q:UInt128, r:UInt64, digits:Int) {
-    let digits: Int
+  static func _div(x:UInt128, radix:Int) -> (q:UInt128, r:UInt64, digits:Int) {
+    var digits = _maxPowers[radix-2]
     let maxDivisor: UInt64
-    let r: (quotient:Magnitude, remainder:Magnitude)
-
+    let r: (quotient:UInt128.Magnitude, remainder:UInt128.Magnitude)
+    
     // set the maximum radix power for the divisor
     switch radix {
-      case  2: maxDivisor = 0x8000_0000_0000_0000; digits = 63
-      case  4: maxDivisor = 0x4000_0000_0000_0000; digits = 31
-      case  8: maxDivisor = 0x8000_0000_0000_0000; digits = 21
-      case 10: maxDivisor = 10_000_000_000_000_000_000; digits = 19
-      case 16: maxDivisor = 0x1000_0000_0000_0000; digits = 15
-      case 32: maxDivisor = 0x1000_0000_0000_0000; digits = 12
+      case  2: maxDivisor = 0x8000_0000_0000_0000
+      case  4: maxDivisor = 0x4000_0000_0000_0000
+      case  8: maxDivisor = 0x8000_0000_0000_0000
+      case 10: maxDivisor = 10_000_000_000_000_000_000
+      case 16: maxDivisor = 0x1000_0000_0000_0000
+      case 32: maxDivisor = 0x1000_0000_0000_0000
       default:
         // Compute the maximum divisor for a worst-case radix of 36
         // Max radix = 36 so 36¹² = 4_738_381_338_321_616_896 < UInt64.max
@@ -96,7 +95,7 @@ extension UInt128 {
     var result = (q:self.magnitude, r:UInt64(0), digits:0)
     var str = ""
     while result.q != Self.zero {
-      result = Self.div(x: result.q, radix: radix)
+      result = Self._div(x: result.q, radix: radix)
       var temp = String(result.r, radix: radix, uppercase: uppercase)
       if result.q != Self.zero {
         temp = String(repeating: "0", count: result.digits-temp.count) + temp
@@ -143,8 +142,8 @@ extension UInt128 {
     guard !text.isEmpty else { return nil }
     guard 2...36 ~= radix else { return nil }
     self.init()
-    if let x = UInt128.value(from: text, radix: radix) {
-      self = Self(x)
+    if let x = Self.value(from: text, radix: radix) {
+      self = x
     } else {
       return nil
     }
@@ -159,52 +158,67 @@ extension UInt128 {
   /// This method breaks `string` into pieces to reduce overhead of the
   /// multiplications and allow UInt64 to work in converting larger numbers.
   fileprivate static func value<S: StringProtocol>(
-      from string: S, radix: Int = 10) -> Self? {
+    from string: S, radix: Int = 10) -> Self? {
     // Handles signs and leading zeros
-    let uradix = UInt64(radix)
     var s = String(string)
+    let uradix = UInt64(radix)
     if s.hasPrefix("-") { return nil }
     if s.hasPrefix("+") { s.removeFirst() }
     while s.hasPrefix("0") { s.removeFirst() }
     
     // Translate the string into a number
-    var r = zero
-    let _ = times(x: zero, timesRadix: uradix, toPower: 1) // initialize table
+    var r = UInt128.zero
     while !s.isEmpty {
       // handle `chunk`-sized digits at a time
-      let chunk = s.prefix(powers.count)
+      let chunk = s.prefix(UInt128._maxPowers[radix-2])
       let size = chunk.count; s.removeFirst(size)
       if let uint = UInt64(chunk, radix: radix) {
         if size != 0 {
-          r = times(x: r, timesRadix: uradix, toPower: size)
+          r = UInt128._multiply(r, timesRadix: uradix, toPower: size)
         }
-        r += Self(high: 0, low: uint)
+        r += UInt128(high: 0, low: uint)
       } else {
         return nil
       }
     }
-    return r
+    return Self(r)
   }
-  
-  /// Computed powers of rⁿ up to UInt64.max where r is the radix
-  private static var powers = [UInt64]()
-  
   /// Multiplies `x` by rⁿ where r is the `radix` and returns the product
-  private static func times<T:FixedWidthInteger>(
-    x: T, timesRadix radix: UInt64, toPower n: Int) -> T {
+  static func _multiply<T:FixedWidthInteger>(
+    _ x: T, timesRadix radix: UInt64, toPower n: Int) -> T {
     // calculate the powers of the radix and store in a table
-    if powers.isEmpty || powers.first! != radix {
-      powers = [UInt64](); powers.reserveCapacity(20)
-      var t = UInt64(1)
-      while t < UInt64.max / radix {
-        t &*= radix
-        powers.append(t)
+    func power(of radix:UInt64, to n:Int) -> UInt64 {
+      var t = UInt64(10)
+      var n = n
+      while n > 0 && t < UInt64.max / radix {
+        t &*= radix; n -= 1
       }
+      return t
     }
-    let radixToPower = powers[n-1]
-    let result = x * T(radixToPower)
-    return result
+    let radixToPower: UInt64
+    if radix == 10 {
+      radixToPower = Self._powers10[n-1]
+    } else {
+      radixToPower = power(of: radix, to: n-1)
+    }
+    return x * T(radixToPower)
   }
+  
+  /// Maximum power of the `radix` for an unsigned 64-bit UInt for base
+  /// indices of 2...36
+  static let _maxPowers : [Int] = [
+    63, 40, 31, 27, 24, 22, 21, 20, 19, 18, 17, 17, 16, 16, 15, 15, 15, 15,
+    14, 14, 14, 14, 13, 13, 13, 13, 13, 13, 13, 13, 13, 12, 12, 12, 12, 12, 12
+  ]
+
+  /// Computed powers of 10ⁿ up to UInt64.max
+  static let _powers10 : [UInt64] = [
+    10, 100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000, 100_000_000,
+    1_000_000_000, 10_000_000_000, 100_000_000_000, 1_000_000_000_000,
+    10_000_000_000_000, 100_000_000_000_000, 1_000_000_000_000_000,
+    10_000_000_000_000_000, 100_000_000_000_000_000, 1_000_000_000_000_000_000,
+    10_000_000_000_000_000_000
+  ]
 }
 
 extension UInt128: Equatable {
@@ -697,34 +711,7 @@ public struct Int128 : Codable {
 }
 
 extension Int128 {
-  /// Divides `x` by rⁿ where r is the `radix`. Returns the quotient,
-  /// remainder, and digits
-  private static func div (x: UInt128, radix: Int) ->
-  (q:UInt128, r:UInt64, digits:Int) {
-    let digits: Int
-    let maxDivisor: UInt64
-    let r: (quotient:Magnitude, remainder:Magnitude)
-
-    // set the maximum radix power for the divisor
-    switch radix {
-      case  2: maxDivisor = 0x8000_0000_0000_0000; digits = 63
-      case  4: maxDivisor = 0x4000_0000_0000_0000; digits = 31
-      case  8: maxDivisor = 0x8000_0000_0000_0000; digits = 21
-      case 10: maxDivisor = 10_000_000_000_000_000_000; digits = 19
-      case 16: maxDivisor = 0x1000_0000_0000_0000; digits = 15
-      case 32: maxDivisor = 0x1000_0000_0000_0000; digits = 12
-      default:
-        // Compute the maximum divisor for a worst-case radix of 36
-        // Max radix = 36 so 36¹² = 4_738_381_338_321_616_896 < UInt64.max
-        var power = radix * radix       // squared
-        power *= power                  // 4th power
-        power = power * power * power   // 12th power
-        maxDivisor = UInt64(power)
-        digits = 12
-    }
-    r = x.quotientAndRemainder(dividingBy: UInt128(high: 0, low: maxDivisor))
-    return (r.quotient, r.remainder.low, digits)
-  }
+  
   
   /// Converts the Int128 `self` into a string with a given `radix`.  The
   /// radix string can use uppercase characters if `uppercase` is true.
@@ -734,18 +721,7 @@ extension Int128 {
   /// digit-based approach.  Ideally this code should be in the String module.
   /// Further optimizations may be possible by using unchecked string buffers.
   internal func _description(radix:Int=10, uppercase:Bool=false) -> String {
-    guard 2...36 ~= radix else { return "0" }
-    if self == Self.zero { return "0" }
-    var result = (q:self.magnitude, r:UInt64(0), digits:0)
-    var str = ""
-    while result.q != Self.zero {
-      result = Self.div(x: result.q, radix: radix)
-      var temp = String(result.r, radix: radix, uppercase: uppercase)
-      if result.q != Self.zero {
-        temp = String(repeating: "0", count: result.digits-temp.count) + temp
-      }
-      str = temp + str
-    }
+    let str = self.magnitude._description(radix:radix, uppercase: uppercase)
     if self._isNegative {
       return "-" + str
     }
@@ -788,8 +764,8 @@ extension Int128 {
     guard !text.isEmpty else { return nil }
     guard 2...36 ~= radix else { return nil }
     self.init()
-    if let x = UInt128.value(from: text, radix: radix) {
-      self = Self(x)
+    if let x = Self.value(from: text, radix: radix) {
+      self = x
     } else {
       return nil
     }
@@ -804,56 +780,20 @@ extension Int128 {
   /// This method breaks `string` into pieces to reduce overhead of the
   /// multiplications and allow UInt64 to work in converting larger numbers.
   fileprivate static func value<S: StringProtocol>(
-      from string: S, radix: Int = 10) -> Self? {
+    from string: S, radix: Int = 10) -> Self? {
     // Handles signs and leading zeros
-    let uradix = UInt64(radix)
     var s = String(string)
     var isNegative = false
-    if s.hasPrefix("-") { isNegative = true }
-    if s.hasPrefix("+") { s.removeFirst() }
-    while s.hasPrefix("0") { s.removeFirst() }
-    
+    if s.hasPrefix("-") { isNegative = true; s.removeFirst() }
+      
     // Translate the string into a number
-    var r = zero
-    let _ = times(x: zero, timesRadix: uradix, toPower: 1) // initialize table
-    while !s.isEmpty {
-      // handle `chunk`-sized digits at a time
-      let chunk = s.prefix(powers.count)
-      let size = chunk.count; s.removeFirst(size)
-      if let uint = UInt64(chunk, radix: radix) {
-        if size != 0 {
-          r = times(x: r, timesRadix: uradix, toPower: size)
-        }
-        r += Self(high: 0, low: uint)
-      } else {
-        return nil
-      }
-    }
+    guard let r = UInt128.value(from: s, radix: radix) else { return nil }
     if isNegative {
-      return -r
+      return -Self(r)
     }
-    return r
+    return Self(r)
   }
-  
-  /// Computed powers of rⁿ up to UInt64.max where r is the radix
-  private static var powers = [UInt64]()
-  
-  /// Multiplies `x` by rⁿ where r is the `radix` and returns the product
-  private static func times<T:FixedWidthInteger>(
-    x: T, timesRadix radix: UInt64, toPower n: Int) -> T {
-    // calculate the powers of the radix and store in a table
-    if powers.isEmpty || powers.first! != radix {
-      powers = [UInt64](); powers.reserveCapacity(20)
-      var t = UInt64(1)
-      while t < UInt64.max / radix {
-        t &*= radix
-        powers.append(t)
-      }
-    }
-    let radixToPower = powers[n-1]
-    let result = x * T(radixToPower)
-    return result
-  }
+          
 }
 
 extension Int128: Equatable {

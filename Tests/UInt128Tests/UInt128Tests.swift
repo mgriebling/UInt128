@@ -1103,7 +1103,7 @@ final class BasicUInt128Tests: XCTestCase {
     // UInt128 from String is 39X faster than UInt128 from Gerber
     self.measure {
       for _ in 1...1000 {
-        let _ = UInt128("123456789012345678901234567890")
+        let _ = UInt128("123456789012345678901234567890", radix:10)
       }
     }
   }
