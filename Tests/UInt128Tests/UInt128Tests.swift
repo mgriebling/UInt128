@@ -883,6 +883,12 @@ class CustomStringConvertibleTests : XCTestCase {
     return tests
   }
   
+  func testLargeString() {
+    let s = "306a0000000000000000000000000000"
+    let u = UInt128(s, radix: 16)!
+    XCTAssert(s == String(u, radix: 16))
+  }
+  
   func testDescriptionProperty() {
     stringTests().forEach { test in
       XCTAssertEqual(test.input.description, test.result[10])
