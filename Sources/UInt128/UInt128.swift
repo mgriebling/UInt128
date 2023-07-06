@@ -124,18 +124,17 @@ extension UInt128: CustomDebugStringConvertible {
   }
 }
 
-
-extension UInt128 : ExpressibleByIntegerLiteral {
-  public typealias IntegerLiteralType = StaticBigInt
-  
-  public init(integerLiteral value: StaticBigInt) {
-    precondition(Low.bitWidth == 64, "Expecting 64-bit UInt")
-    precondition(value.signum() >= 0, "UInt128 literal cannot be negative")
-    precondition(value.bitWidth <= Self.bitWidth+1,
-                 "\(value.bitWidth)-bit literal too large for UInt128")
-    self.init(high: High(value[1]), low: Low(value[0]))
-  }
-}
+//extension UInt128 : ExpressibleByIntegerLiteral {
+//  public typealias IntegerLiteralType = StaticBigInt
+//
+//  public init(integerLiteral value: StaticBigInt) {
+//    precondition(Low.bitWidth == 64, "Expecting 64-bit UInt")
+//    precondition(value.signum() >= 0, "UInt128 literal cannot be negative")
+//    precondition(value.bitWidth <= Self.bitWidth+1,
+//                 "\(value.bitWidth)-bit literal too large for UInt128")
+//    self.init(high: High(value[1]), low: Low(value[0]))
+//  }
+//}
 
 extension UInt128 {
   public init?<S: StringProtocol>(_ text: S, radix: Int = 10) {
@@ -748,16 +747,16 @@ extension Int128: CustomDebugStringConvertible {
 }
 
 
-extension Int128 : ExpressibleByIntegerLiteral {
-  public typealias IntegerLiteralType = StaticBigInt
-  
-  public init(integerLiteral value: StaticBigInt) {
-    precondition(Low.bitWidth == 64, "Expecting 64-bit UInt")
-    precondition(value.bitWidth <= Self.bitWidth,
-                 "\(value.bitWidth)-bit literal too large for Int128")
-    self.init(high: High(bitPattern:UInt64(value[1])), low: Low(value[0]))
-  }
-}
+//extension Int128 : ExpressibleByIntegerLiteral {
+//  public typealias IntegerLiteralType = StaticBigInt
+//  
+//  public init(integerLiteral value: StaticBigInt) {
+//    precondition(Low.bitWidth == 64, "Expecting 64-bit UInt")
+//    precondition(value.bitWidth <= Self.bitWidth,
+//                 "\(value.bitWidth)-bit literal too large for Int128")
+//    self.init(high: High(bitPattern:UInt64(value[1])), low: Low(value[0]))
+//  }
+//}
 
 extension Int128 {
   public init?<S: StringProtocol>(_ text: S, radix: Int = 10) {
