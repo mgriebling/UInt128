@@ -25,17 +25,18 @@ This package is compliant with the following protocols:
 11. Sendable
 12. Codable
 
-This package now supports `StaticBigInt`.  Unfortunately, this means you need
-to have one of following configurations (or higher) 
-
-1. macOS 13.3+, 
-2. iOS 16.4+, 
-3. macCatalyst 16.4+, 
-4. tvOS 16.4+,
-5. watchOS 9.4+
-
-If you don't have these configurations, you need to use a previous release of
-UInt128/Int128.
+Removed StaticBigInt support temporarily.  Use previous release if you need this.
+<!--This package now supports `StaticBigInt`.  Unfortunately, this means you need-->
+<!--to have one of following configurations (or higher) -->
+<!---->
+<!--1. macOS 13.3+, -->
+<!--2. iOS 16.4+, -->
+<!--3. macCatalyst 16.4+, -->
+<!--4. tvOS 16.4+,-->
+<!--5. watchOS 9.4+-->
+<!---->
+<!--If you don't have these configurations, you need to use a previous release of-->
+<!--UInt128/Int128.-->
 
 ## Installation
 This library includes Swift Package support out of the box.
