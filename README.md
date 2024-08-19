@@ -72,19 +72,6 @@ For example:
   let uInt128ByLiteral: UInt128 = 0xffaa_bbcc_0012_9823_fa9a_12d4_aa87_f498
   let uInt128ByInteger: UInt128 = 1234
 ```
-    
-The `Int128.swift.gyb` file is the source for the generated file `UInt128.swift` (containing
-both `Int128` and `UInt128` number types). If you would like to contribute to this
-project, please make changes in the .gyb file and remember to include signed and
-unsigned variants of the changes. The source files are automagically generated using a gyb tool
-invocation like:
-
-```
-/utils/gyb -D CMAKE_SIZEOF_VOID_P=8 --line-directive '' /Users/.../Int128.swift.gyb -o/Users/.../UInt128.swift
-```
-
-The `...` represents the detailed file path to get to your .gyb and output files.
-The gyb tool is available from Apple.
 
 ## Testing
 Some tests are included (many from Joel Gerber's great UInt128 implementation)
