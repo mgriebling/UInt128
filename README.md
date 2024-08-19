@@ -25,26 +25,32 @@ This package is compliant with the following protocols:
 11. Sendable
 12. Codable
 
-Removed StaticBigInt support temporarily.  Use previous release if you need this.
-<!--This package now supports `StaticBigInt`.  Unfortunately, this means you need-->
-<!--to have one of following configurations (or higher) -->
-<!---->
-<!--1. macOS 13.3+, -->
-<!--2. iOS 16.4+, -->
-<!--3. macCatalyst 16.4+, -->
-<!--4. tvOS 16.4+,-->
-<!--5. watchOS 9.4+-->
-<!---->
-<!--If you don't have these configurations, you need to use a previous release of-->
-<!--UInt128/Int128.-->
+This package now supports `StaticBigInt`. Unfortunately, this means you need
+to have one of following configurations (or higher) 
+
+1. macOS 13.3+, 
+2. iOS 16.4+, 
+3. macCatalyst 16.4+, 
+4. tvOS 16.4+,
+5. watchOS 9.4+
+
+If you don't have these configurations, you need to use a previous release of
+UInt128/Int128.
+
+If you're working with macOS 15.0+, iOS 18.0+, or tvOS 18.0+, you won't need
+this package any more because Int128/UInt128 are built into the OS.  Just
+remove the imports of this package and you should be good.  If you use the
+internals of this package (low, high) and init(low, high), these will need
+to have underscores prefixed on the arguments.  Apple does this to indicate internal variables
+and methods that you shouldn't use unless you know what you're doing.
 
 ## Installation
 This library includes Swift Package support out of the box.
 Reference this git repository via XCode to install as a Package.
 
-You can also manually copy over the `Sources/UInt128.swift` file into your project
-and it should work great. I've purposely kept this library constrained to a
-single file in order to support this use case.
+You can also manually copy over the `Sources/(U)Int128.swift` files into your project
+and it should work great. This file split duplicates Apple's UInt128 and Int128
+files. Note: Some common utilities are located in the Int128.swift file.
 
 ## Usage
 Since this library fully implements the UnsignedInteger or SignedInteger protocol, 
