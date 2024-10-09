@@ -1,3 +1,6 @@
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fmgriebling%2FUInt128%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/mgriebling/UInt128)
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fmgriebling%2FUInt128%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/mgriebling/UInt128)
+
 # UInt128/Int128
 
 A 128-bit unsigned/signed integer implementation with optimized multiplication, division, and string conversions.
