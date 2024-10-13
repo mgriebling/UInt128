@@ -42,6 +42,8 @@ These integer types are compliant with the following protocols:
 11. Sendable
 12. Codable
 
+This package has passed the XCode 6 strict concurrency requirements.
+
 ### Usage
 Since this library fully implements the UnsignedInteger or SignedInteger protocols, 
 you can use these data types just like any other native integer data type. For numbers larger

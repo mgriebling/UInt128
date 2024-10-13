@@ -25,9 +25,12 @@ UInt128/Int128.
 This library includes Swift Package support out of the box.
 Reference this git repository via XCode to install as a Package.
 
+  - Warning: This interface uses different initializers than earlier versions.
+
 You can also manually copy over the `Sources/(U)Int128.swift` files into your project
 and it should work great. This file split duplicates Apple's UInt128 and Int128
-files. Note: Some common utilities are located in the Int128.swift file.
+files. Note: Some common utilities are located in the `Common.swift` file which
+you'll also need if copying to your project.
 
 ## Documentation
 
