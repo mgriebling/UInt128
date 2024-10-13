@@ -13,15 +13,13 @@ and methods that you shouldn't use unless you know what you're doing.
 This package is usually around ten times faster than other UInt128 implementations and roughly the same
 speed as Apple's implementation. If you find something faster, please let me know.
 
-## Overview
-
 The `UInt128` package name is a bit of a misnomer since it actually includes 
 two datatypes:
 
 1. ``UInt128`` which is an unsigned 128-bit integer type, and
 2. ``Int128`` which is a signed 128-bit integer type.
 
-## Topics
+## Details
 
 ### Protocol Support
 
